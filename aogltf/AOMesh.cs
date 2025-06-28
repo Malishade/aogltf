@@ -106,6 +106,7 @@ namespace AODB.Encoding
                 //This will definitely not work for all cases, but it should be fine for most of the meshes
                 var matrix = refFrameClass.anim_matrix.ToNumerics() * ((Transform)_rdbMesh.Members[0]).anim_matrix.ToNumerics();
                 Matrix4x4.Decompose(matrix, out Vector3 scale, out Quaternion rotation, out Vector3 translation);
+
                 refFrame.Translation = translation;
                 refFrame.Rotation = rotation;
                 refFrame.Scale = scale;
@@ -120,26 +121,38 @@ namespace AODB.Encoding
 
             ObjectNode node = new ObjectNode();
             node.Name = GetUniqueNodeName(triMeshDataClass.name);
+            var hasAnims = false;
 
-            //var hasAnims = BuildFAFAnim(node, triMeshDataClass.anim_pos, triMeshDataClass.anim_rot, triMeshClass);
+            BuildMeshes(node, triMeshClass, triMeshDataClass, hasAnims);
 
-            BuildMeshes(node, triMeshClass, triMeshDataClass);
-            //BuildUVKeys(sceneMeshesIdx, triMeshClass);
-
-            node.Scale = new Vector3(triMeshClass.scale, triMeshClass.scale, triMeshClass.scale);
-            node.Rotation = triMeshClass.local_rot.ToNumerics();
             node.Translation = triMeshClass.local_pos.ToNumerics();
+            node.Rotation = triMeshClass.local_rot.ToNumerics();
+            node.Scale = new Vector3(triMeshClass.scale, triMeshClass.scale, triMeshClass.scale);
 
             return node;
         }
 
-        private void BuildMeshes(ObjectNode node, RTriMesh_t triMeshClass, FAFTriMeshData_t triMeshDataClass)
+        private void BuildMeshes(ObjectNode node, RTriMesh_t triMeshClass, FAFTriMeshData_t triMeshDataClass, bool hasAnims)
         {
             foreach (int meshIdx in triMeshDataClass.mesh)
             {
                 SimpleMesh simpleMeshClass = _rdbMesh.Members[meshIdx] as SimpleMesh;
                 TriList triListClass = _rdbMesh.Members[simpleMeshClass.trilist] as TriList;
-                node.MeshData = new StaticMeshData(simpleMeshClass.Vertices.Select(x => x.Position.ToNumerics()).ToArray(), triListClass.Triangles.Select(i => checked((ushort)i)).ToArray());
+
+                Matrix4x4 transformMatrix = Matrix4x4.Identity;
+
+                if (!hasAnims)
+                {
+                    Quaternion rot = triMeshDataClass.anim_rot.ToNumerics();
+                    Vector3 pos = triMeshDataClass.anim_pos.ToNumerics();
+
+                    var rotationMatrix = Matrix4x4.CreateFromQuaternion(rot);
+                    var translationMatrix = Matrix4x4.CreateTranslation(pos);
+
+                    transformMatrix = rotationMatrix * translationMatrix;
+                }
+
+                node.MeshData = new StaticMeshData(simpleMeshClass.Vertices.Select(x => transformMatrix.MultiplyPoint(x.Position.ToNumerics())).ToArray(), triListClass.Triangles.Select(i => checked((ushort)i)).ToArray());
             }
         }
     }
