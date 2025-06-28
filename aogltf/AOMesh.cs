@@ -4,8 +4,6 @@ using System.Numerics;
 using static AODB.Common.DbClasses.RDBMesh_t;
 using static AODB.Common.DbClasses.RDBMesh_t.FAFAnim_t;
 using static AODB.Common.RDBObjects.RDBCatMesh;
-using AVector3 = AODB.Common.Structs.Vector3;
-using AQuaternion = AODB.Common.Structs.Quaternion;
 
 namespace AODB.Encoding
 {
@@ -63,12 +61,12 @@ namespace AODB.Encoding
                 if (transforms[i].chld_cnt == 0)
                     continue;
 
-                if (!sceneObjects.TryGetValue(i, out ObjectNode parent))
+                if (!sceneObjects.TryGetValue(i, out ObjectNode? parent))
                     continue;
 
                 foreach (int childIdx in transforms[i].chld)
                 {
-                    if (sceneObjects.TryGetValue(childIdx, out ObjectNode childNode))
+                    if (sceneObjects.TryGetValue(childIdx, out ObjectNode? childNode))
                     {
                         parent.Children.Add(childNode);
                     }
@@ -117,9 +115,14 @@ namespace AODB.Encoding
 
         private ObjectNode BuildTriMesh(RTriMesh_t triMeshClass)
         {
-            FAFTriMeshData_t triMeshDataClass = _rdbMesh.Members[triMeshClass.data] as FAFTriMeshData_t;
-
             ObjectNode node = new ObjectNode();
+
+            if (_rdbMesh.Members[triMeshClass.data] is not FAFTriMeshData_t triMeshDataClass)
+            {
+                Console.WriteLine("Null mesh");
+                return node;
+            }
+
             node.Name = GetUniqueNodeName(triMeshDataClass.name);
             var hasAnims = false;
 
@@ -136,8 +139,11 @@ namespace AODB.Encoding
         {
             foreach (int meshIdx in triMeshDataClass.mesh)
             {
-                SimpleMesh simpleMeshClass = _rdbMesh.Members[meshIdx] as SimpleMesh;
-                TriList triListClass = _rdbMesh.Members[simpleMeshClass.trilist] as TriList;
+                if (_rdbMesh.Members[meshIdx] is not SimpleMesh simpleMeshClass || _rdbMesh.Members[simpleMeshClass.trilist] is not TriList triListClass)
+                {
+                    Console.WriteLine("Null mesh");
+                    continue;
+                }
 
                 Matrix4x4 transformMatrix = Matrix4x4.Identity;
 
@@ -152,7 +158,9 @@ namespace AODB.Encoding
                     transformMatrix = rotationMatrix * translationMatrix;
                 }
 
-                node.MeshData = new StaticMeshData(simpleMeshClass.Vertices.Select(x => transformMatrix.MultiplyPoint(x.Position.ToNumerics())).ToArray(), triListClass.Triangles.Select(i => checked((ushort)i)).ToArray());
+                var vertices = simpleMeshClass.Vertices.Select(x => transformMatrix.MultiplyPoint(x.Position.ToNumerics())).ToArray();
+                var indices = triListClass.Triangles.Select(i => checked((ushort)i)).ToArray();
+                node.MeshData = new StaticMeshData(vertices, indices);
             }
         }
     }
