@@ -22,39 +22,39 @@
     internal class GltfExporter
     {
         /// <summary>
-        /// Writes mesh data to the specified format at the given location
+        /// Exports given object to the specified format at the given location
         /// </summary>
         /// <param name="outputFolder">Directory where the file will be written</param>
         /// <param name="fileNameNoExtension">Base filename without extension</param>
-        /// <param name="meshData">Mesh data</param>
         /// <param name="fileExtension">Target format (glTF or GLB)</param>
-        public static void WriteAllData(string outputFolder, string fileNameNoExtension, FileExtension fileExtension, StaticMeshData meshData)
+        /// <param name="objectData">Object data hierarchy</param>
+        public static void WriteAllData(string outputFolder, string fileNameNoExtension, FileExtension fileExtension, ObjectNode objectData)
         {
             switch (fileExtension)
             {
                 case FileExtension.Gltf:
-                    WriteGltf(outputFolder, fileNameNoExtension, meshData);
+                    WriteGltf(outputFolder, fileNameNoExtension, objectData);
                     break;
                 case FileExtension.Glb:
-                    WriteGlb(outputFolder, fileNameNoExtension, meshData);
+                    WriteGlb(outputFolder, fileNameNoExtension, objectData);
                     break;
                 default:
                     throw new ArgumentException($"Unsupported file extension: {fileExtension}");
             }
         }
 
-        private static void WriteGltf(string outputFolder, string fileNameNoExtension, StaticMeshData meshData)
+        private static void WriteGltf(string outputFolder, string fileNameNoExtension, ObjectNode nestedObjectData)
         {
-            Gltf gltf = GltfBuilder.Create(meshData, out byte[] bufferData);
+            Gltf gltf = GltfBuilder.Create(nestedObjectData, out byte[] bufferData);
             gltf.Buffers[0].Uri = $"{fileNameNoExtension}.bin";
             var binPath = Path.Combine(outputFolder, $"{fileNameNoExtension}.bin");
             File.WriteAllBytes(binPath, bufferData);
             GltfFileWriter.WriteToFile(Path.Combine(outputFolder, $"{fileNameNoExtension}.gltf"), gltf);
         }
 
-        private static void WriteGlb(string outputFolder, string fileNameNoExtension, StaticMeshData meshData)
+        private static void WriteGlb(string outputFolder, string fileNameNoExtension, ObjectNode nestedObjectData)
         {
-            Gltf gltf = GltfBuilder.Create(meshData, out byte[] bufferData);
+            Gltf gltf = GltfBuilder.Create(nestedObjectData, out byte[] bufferData);
             GltfFileWriter.WriteToFile(Path.Combine(outputFolder, $"{fileNameNoExtension}.glb"), gltf, bufferData);
         }
     }

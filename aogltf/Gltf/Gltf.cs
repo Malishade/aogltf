@@ -107,7 +107,25 @@ namespace aogltf
     public class Node
     {
         [JsonPropertyName("mesh")]
-        public int Mesh { get; set; }
+        public int? Mesh { get; set; } // Nullable - not all nodes have meshes
+
+        [JsonPropertyName("children")]
+        public int[]? Children { get; set; } // Child node indices
+
+        [JsonPropertyName("translation")]
+        public float[]? Translation { get; set; } // [x, y, z]
+
+        [JsonPropertyName("rotation")]
+        public float[]? Rotation { get; set; } // [x, y, z, w]
+
+        [JsonPropertyName("scale")]
+        public float[]? Scale { get; set; } // [x, y, z]
+
+        [JsonPropertyName("matrix")]
+        public float[]? Matrix { get; set; } // 4x4 transformation matrix (alternative to TRS)
+
+        [JsonPropertyName("name")]
+        public string? Name { get; set; }
     }
 
     public class Scene
