@@ -21,10 +21,8 @@ namespace aogltf
             var meshDataList = new List<StaticMeshData>();
             var nodeDataList = new List<NodeData>();
 
-            // Collect all mesh data and build node hierarchy
             CollectMeshesAndNodes(rootNode, meshDataList, nodeDataList, null);
 
-            // Create binary buffer from all meshes
             var bufferResult = BinaryBufferBuilder.CreateBuffer([.. meshDataList]);
             bufferData = bufferResult.Data;
 
@@ -62,13 +60,11 @@ namespace aogltf
 
             nodes.Add(nodeData);
 
-            // Add this node as child to parent
             if (parentIndex.HasValue)
             {
                 nodes[parentIndex.Value].Children.Add(currentNodeIndex);
             }
 
-            // Process children
             foreach (var child in obj.Children)
             {
                 CollectMeshesAndNodes(child, meshes, nodes, currentNodeIndex);
@@ -126,7 +122,6 @@ namespace aogltf
             public List<int> Children { get; set; } = new();
         }
 
-        // Rest of the methods remain the same...
         private static Asset CreateAsset() => new Asset();
 
         private static Buffer[] CreateBuffers(int binaryBufferLength) => [new Buffer { Uri = null, ByteLength = binaryBufferLength }];
@@ -169,7 +164,6 @@ namespace aogltf
             {
                 var meshData = meshDataArray[i];
 
-                // Vertex accessor
                 accessors.Add(new Accessor
                 {
                     BufferView = i * 2,
@@ -181,7 +175,6 @@ namespace aogltf
                     Max = [meshData.Bounds.Max.X, meshData.Bounds.Max.Y, meshData.Bounds.Max.Z]
                 });
 
-                // Index accessor
                 accessors.Add(new Accessor
                 {
                     BufferView = i * 2 + 1,
