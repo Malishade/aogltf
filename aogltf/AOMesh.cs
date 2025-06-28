@@ -160,7 +160,9 @@ namespace AODB.Encoding
 
                 var vertices = simpleMeshClass.Vertices.Select(x => transformMatrix.MultiplyPoint(x.Position.ToNumerics())).ToArray();
                 var indices = triListClass.Triangles.Select(i => checked((ushort)i)).ToArray();
-                node.MeshData = new StaticMeshData(vertices, indices);
+                var normals = simpleMeshClass.Vertices.Select(x => x.Normal.ToNumerics()).ToArray();
+
+                node.MeshData = new StaticMeshData(vertices, indices, normals);
             }
         }
     }

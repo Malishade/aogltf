@@ -32,7 +32,7 @@ namespace aogltf
                 Buffers = CreateBuffers(bufferResult.Data.Length),
                 BufferViews = CreateBufferViews(bufferResult.Layout),
                 Accessors = CreateAccessors(meshDataList.ToArray(), bufferResult.Layout),
-                Meshes = CreateMeshes(meshDataList.Count),
+                Meshes = CreateMeshes(meshDataList.ToArray()),
                 Nodes = CreateNodes(nodeDataList),
                 Scenes = CreateScenes(),
                 Scene = 0
@@ -92,18 +92,36 @@ namespace aogltf
             return nodes;
         }
 
-        private static Mesh[] CreateMeshes(int meshCount)
+        private static Mesh[] CreateMeshes(StaticMeshData[] meshDataArray)
         {
-            var meshes = new Mesh[meshCount];
-            for (int i = 0; i < meshCount; i++)
+            var meshes = new Mesh[meshDataArray.Length];
+            int accessorIndex = 0;
+
+            for (int i = 0; i < meshDataArray.Length; i++)
             {
+                var meshData = meshDataArray[i];
+
+                // Position index accessor
+                var attributes = new Dictionary<string, int>
+                {
+                    { "POSITION", accessorIndex++ }
+                };
+
+                // Normal index accessor (if normals exist)
+                if (meshData.Normals != null && meshData.Normals.Length > 0)
+                {
+                    attributes.Add("NORMAL", accessorIndex++);
+                }
+
+                var indicesAccessor = accessorIndex++;
+
                 meshes[i] = new Mesh
                 {
                     Primitives = [
                         new Primitive
                         {
-                            Attributes = new Dictionary<string, int> { { "POSITION", i * 2 } },
-                            Indices = i * 2 + 1,
+                            Attributes = attributes,
+                            Indices = indicesAccessor,
                             Mode = Constants.TRIANGLES
                         }
                     ]
@@ -111,6 +129,7 @@ namespace aogltf
             }
             return meshes;
         }
+
 
         private class NodeData
         {
@@ -143,6 +162,18 @@ namespace aogltf
                     Target = Constants.ARRAY_BUFFER
                 });
 
+                // Normal buffer view (if normals exist)
+                if (meshLayout.NormalSection.Length > 0)
+                {
+                    views.Add(new BufferView
+                    {
+                        Buffer = 0,
+                        ByteOffset = meshLayout.NormalSection.Offset,
+                        ByteLength = meshLayout.NormalSection.Length,
+                        Target = Constants.ARRAY_BUFFER
+                    });
+                }
+
                 // Index buffer view
                 views.Add(new BufferView
                 {
@@ -159,14 +190,16 @@ namespace aogltf
         private static Accessor[] CreateAccessors(StaticMeshData[] meshDataArray, BufferLayout layout)
         {
             var accessors = new List<Accessor>();
+            int bufferViewIndex = 0;
 
             for (int i = 0; i < meshDataArray.Length; i++)
             {
                 var meshData = meshDataArray[i];
 
+                // Position accessor
                 accessors.Add(new Accessor
                 {
-                    BufferView = i * 2,
+                    BufferView = bufferViewIndex++,
                     ByteOffset = 0,
                     ComponentType = Constants.FLOAT,
                     Count = meshData.Vertices.Length,
@@ -175,9 +208,23 @@ namespace aogltf
                     Max = [meshData.Bounds.Max.X, meshData.Bounds.Max.Y, meshData.Bounds.Max.Z]
                 });
 
+                // Normal accessor (if normals exist)
+                if (meshData.Normals != null && meshData.Normals.Length > 0)
+                {
+                    accessors.Add(new Accessor
+                    {
+                        BufferView = bufferViewIndex++,
+                        ByteOffset = 0,
+                        ComponentType = Constants.FLOAT,
+                        Count = meshData.Normals.Length,
+                        Type = "VEC3"
+                    });
+                }
+
+                // Index accessor
                 accessors.Add(new Accessor
                 {
-                    BufferView = i * 2 + 1,
+                    BufferView = bufferViewIndex++,
                     ByteOffset = 0,
                     ComponentType = Constants.UNSIGNED_SHORT,
                     Count = meshData.Indices.Length,
@@ -191,7 +238,7 @@ namespace aogltf
         private static Scene[] CreateScenes() => [new Scene { Nodes = [0] }];
 
         private readonly record struct BufferSection(int Offset, int Length);
-        private readonly record struct MeshLayout(BufferSection VertexSection, BufferSection IndexSection);
+        private readonly record struct MeshLayout(BufferSection VertexSection, BufferSection NormalSection, BufferSection IndexSection);
         private readonly record struct BufferLayout(MeshLayout[] MeshLayouts);
         private readonly record struct BinaryBufferResult(byte[] Data, BufferLayout Layout);
 
@@ -208,10 +255,14 @@ namespace aogltf
                 {
                     var vertexSection = WriteVertexData(writer, meshDataArray[i].Vertices);
                     AlignStream(writer, 4);
+
+                    var normalSection = WriteNormalData(writer, meshDataArray[i].Normals);
+                    AlignStream(writer, 4);
+
                     var indexSection = WriteIndexData(writer, meshDataArray[i].Indices);
                     AlignStream(writer, 4);
 
-                    meshLayouts[i] = new MeshLayout(vertexSection, indexSection);
+                    meshLayouts[i] = new MeshLayout(vertexSection, normalSection, indexSection);
                 }
 
                 var layout = new BufferLayout(meshLayouts);
@@ -241,6 +292,21 @@ namespace aogltf
                     writer.Write(index);
                 }
                 int length = indices.Length * sizeof(ushort);
+                return new BufferSection(startOffset, length);
+            }
+            private static BufferSection WriteNormalData(BinaryWriter writer, Vector3[] normals)
+            {
+                int startOffset = (int)writer.BaseStream.Position;
+                if (normals != null)
+                {
+                    foreach (var normal in normals)
+                    {
+                        writer.Write(normal.X);
+                        writer.Write(normal.Y);
+                        writer.Write(normal.Z);
+                    }
+                }
+                int length = (normals?.Length ?? 0) * sizeof(float) * 3;
                 return new BufferSection(startOffset, length);
             }
 
