@@ -72,7 +72,7 @@ namespace aogltf
             return rootObject;
         }
 
-        private static StaticMeshData MakeTestCube()
+        private static MeshData MakeTestCube()
         {
             Vector3[] positions =
             [
@@ -92,7 +92,7 @@ namespace aogltf
                 0, 3, 7, 7, 4, 0
             ];
 
-            return new StaticMeshData(positions, indices);
+            return new MeshData(positions, indices);
         }
     }
 }

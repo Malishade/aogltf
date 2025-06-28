@@ -18,7 +18,7 @@ namespace aogltf
 
         public static Gltf Create(ObjectNode rootNode, out byte[] bufferData)
         {
-            var meshDataList = new List<StaticMeshData>();
+            var meshDataList = new List<MeshData>();
             var nodeDataList = new List<NodeData>();
 
             CollectMeshesAndNodes(rootNode, meshDataList, nodeDataList, null);
@@ -39,7 +39,7 @@ namespace aogltf
             };
         }
 
-        private static void CollectMeshesAndNodes(ObjectNode obj, List<StaticMeshData> meshes, List<NodeData> nodes, int? parentIndex)
+        private static void CollectMeshesAndNodes(ObjectNode obj, List<MeshData> meshes, List<NodeData> nodes, int? parentIndex)
         {
             int currentNodeIndex = nodes.Count;
 
@@ -92,7 +92,7 @@ namespace aogltf
             return nodes;
         }
 
-        private static Mesh[] CreateMeshes(StaticMeshData[] meshDataArray)
+        private static Mesh[] CreateMeshes(MeshData[] meshDataArray)
         {
             var meshes = new Mesh[meshDataArray.Length];
             int accessorIndex = 0;
@@ -111,6 +111,12 @@ namespace aogltf
                 if (meshData.Normals != null && meshData.Normals.Length > 0)
                 {
                     attributes.Add("NORMAL", accessorIndex++);
+                }
+
+                // UV index accessor (if UVs exist)
+                if (meshData.UVs != null && meshData.UVs.Length > 0)
+                {
+                    attributes.Add("TEXCOORD_0", accessorIndex++);
                 }
 
                 var indicesAccessor = accessorIndex++;
@@ -174,6 +180,19 @@ namespace aogltf
                     });
                 }
 
+                // UV buffer view (if UVs exist)
+                if (meshLayout.UVSection.Length > 0)
+                {
+                    views.Add(new BufferView
+                    {
+                        Buffer = 0,
+                        ByteOffset = meshLayout.UVSection.Offset,
+                        ByteLength = meshLayout.UVSection.Length,
+                        Target = Constants.ARRAY_BUFFER
+                    });
+                }
+
+
                 // Index buffer view
                 views.Add(new BufferView
                 {
@@ -187,7 +206,7 @@ namespace aogltf
             return views.ToArray();
         }
 
-        private static Accessor[] CreateAccessors(StaticMeshData[] meshDataArray, BufferLayout layout)
+        private static Accessor[] CreateAccessors(MeshData[] meshDataArray, BufferLayout layout)
         {
             var accessors = new List<Accessor>();
             int bufferViewIndex = 0;
@@ -221,6 +240,20 @@ namespace aogltf
                     });
                 }
 
+                // UV accessor (if UVs exist)
+                if (meshData.UVs != null && meshData.UVs.Length > 0)
+                {
+                    accessors.Add(new Accessor
+                    {
+                        BufferView = bufferViewIndex++,
+                        ByteOffset = 0,
+                        ComponentType = Constants.FLOAT,
+                        Count = meshData.UVs.Length,
+                        Type = "VEC2"
+                        // Is min/max needed here? (maybe for optimization??)
+                    });
+                }
+
                 // Index accessor
                 accessors.Add(new Accessor
                 {
@@ -238,13 +271,13 @@ namespace aogltf
         private static Scene[] CreateScenes() => [new Scene { Nodes = [0] }];
 
         private readonly record struct BufferSection(int Offset, int Length);
-        private readonly record struct MeshLayout(BufferSection VertexSection, BufferSection NormalSection, BufferSection IndexSection);
+        private readonly record struct MeshLayout(BufferSection VertexSection, BufferSection NormalSection, BufferSection UVSection, BufferSection IndexSection);
         private readonly record struct BufferLayout(MeshLayout[] MeshLayouts);
         private readonly record struct BinaryBufferResult(byte[] Data, BufferLayout Layout);
 
         private class BinaryBufferBuilder
         {
-            internal static BinaryBufferResult CreateBuffer(StaticMeshData[] meshDataArray)
+            internal static BinaryBufferResult CreateBuffer(MeshData[] meshDataArray)
             {
                 using var stream = new MemoryStream();
                 using var writer = new BinaryWriter(stream);
@@ -259,10 +292,13 @@ namespace aogltf
                     var normalSection = WriteNormalData(writer, meshDataArray[i].Normals);
                     AlignStream(writer, 4);
 
+                    var uvSection = WriteUVData(writer, meshDataArray[i].UVs);
+                    AlignStream(writer, 4);
+
                     var indexSection = WriteIndexData(writer, meshDataArray[i].Indices);
                     AlignStream(writer, 4);
 
-                    meshLayouts[i] = new MeshLayout(vertexSection, normalSection, indexSection);
+                    meshLayouts[i] = new MeshLayout(vertexSection, normalSection, uvSection, indexSection);
                 }
 
                 var layout = new BufferLayout(meshLayouts);
@@ -284,6 +320,21 @@ namespace aogltf
                 return new BufferSection(startOffset, length);
             }
 
+            private static BufferSection WriteUVData(BinaryWriter writer, Vector2[] uvs)
+            {
+                int startOffset = (int)writer.BaseStream.Position;
+                if (uvs != null)
+                {
+                    foreach (var uv in uvs)
+                    {
+                        writer.Write(uv.X);
+                        writer.Write(uv.Y);
+                    }
+                }
+                int length = (uvs?.Length ?? 0) * sizeof(float) * 2;
+                return new BufferSection(startOffset, length);
+            }
+
             private static BufferSection WriteIndexData(BinaryWriter writer, ushort[] indices)
             {
                 int startOffset = (int)writer.BaseStream.Position;
@@ -294,6 +345,7 @@ namespace aogltf
                 int length = indices.Length * sizeof(ushort);
                 return new BufferSection(startOffset, length);
             }
+
             private static BufferSection WriteNormalData(BinaryWriter writer, Vector3[] normals)
             {
                 int startOffset = (int)writer.BaseStream.Position;

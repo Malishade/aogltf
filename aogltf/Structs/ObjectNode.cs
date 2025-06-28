@@ -5,7 +5,7 @@ namespace aogltf
 {
     public class ObjectNode
     {
-        public StaticMeshData? MeshData { get; set; } // Null if this is just a transform node
+        public MeshData? MeshData { get; set; } // Null if this is just a transform node
         public Vector3 Translation { get; set; } = Vector3.Zero;
         public Quaternion Rotation { get; set; } = Quaternion.Identity;
         public Vector3 Scale { get; set; } = Vector3.One;
