@@ -46,21 +46,26 @@ namespace aogltf
 
     public class MeshData
     {
-        public Vector3[] Vertices { get; private set; }
-        public Vector3[] Normals { get; private set; }
-        public Vector2[] UVs { get; private set; }
-        public ushort[] Indices { get; private set; }
-        public Bounds Bounds { get; private set; }
-        public int? MaterialIndex { get; set; }
+        public List<PrimitiveData> Primitives { get; set; } = new();
         public int? SourceMeshIndex { get; set; }
+    }
 
-        public MeshData(Vector3[] vertices, ushort[] indices, Vector3[] normals, Vector2[] uvs, int? materialIndex = null)
+    public class PrimitiveData
+    {
+        public Vector3[] Vertices { get; set; }
+        public Vector3[] Normals { get; set; }
+        public Vector2[] UVs { get; set; }
+        public ushort[] Indices { get; set; }
+        public Bounds Bounds { get; set; }
+        public int? MaterialIndex { get; set; }
+
+        public PrimitiveData(Vector3[] vertices, Vector3[] normals, Vector2[] uvs, ushort[] indices, int? materialIndex)
         {
             Vertices = vertices;
-            Indices = indices;
-            Bounds = Bounds.FromVertices(vertices);
             Normals = normals;
             UVs = uvs;
+            Indices = indices;
+            Bounds = Bounds.FromVertices(vertices);
             MaterialIndex = materialIndex;
         }
     }

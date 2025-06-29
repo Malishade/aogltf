@@ -34,32 +34,41 @@ namespace aogltf
             if (_rdbMesh.Members[sourceMeshIndex] is not FAFTriMeshData_t triMeshData)
                 return null;
 
-            if (triMeshData.mesh.Length == 0)
-                return null;
+            var meshData = new MeshData { SourceMeshIndex = sourceMeshIndex };
 
-            int meshIdx = triMeshData.mesh[0];
-
-            if (_rdbMesh.Members[meshIdx] is not SimpleMesh simpleMesh ||
-                _rdbMesh.Members[simpleMesh.trilist] is not TriList triList)
-                return null;
-
-            Matrix4x4 transform = CreateTransformMatrix(triMeshData);
-            Vector3[] vertices = simpleMesh.Vertices.Select(v => transform.MultiplyPoint(v.Position.ToNumerics())).ToArray();
-            ushort[] indices = triList.Triangles.Select(i => checked((ushort)i)).ToArray();
-            Vector3[] normals = simpleMesh.Vertices.Select(v => v.Normal.ToNumerics()).ToArray();
-            Vector2[] uvs = simpleMesh.Vertices.Select(v => new Vector2(v.UVs.X, v.UVs.Y)).ToArray();
-
-            int? materialIndex = simpleMesh.material >= 0 ? simpleMesh.material : null;
-
-            var meshData = new MeshData(vertices, indices, normals, uvs, materialIndex)
+            foreach (int meshIdx in triMeshData.mesh)
             {
-                SourceMeshIndex = sourceMeshIndex
-            };
+                if (_rdbMesh.Members[meshIdx] is not SimpleMesh simpleMesh ||
+                    _rdbMesh.Members[simpleMesh.trilist] is not TriList triList)
+                    continue;
 
-            int newMeshIndex = sceneData.Meshes.Count;
+                Matrix4x4 transform = CreateTransformMatrix(triMeshData);
+
+                var vertices = simpleMesh.Vertices
+                    .Select(v => transform.MultiplyPoint(v.Position.ToNumerics()))
+                    .ToArray();
+
+                var normals = simpleMesh.Vertices
+                    .Select(v => v.Normal.ToNumerics())
+                    .ToArray();
+
+                var uvs = simpleMesh.Vertices
+                    .Select(v => new Vector2(v.UVs.X, v.UVs.Y))
+                    .ToArray();
+
+                var indices = triList.Triangles
+                    .Select(i => checked((ushort)i))
+                    .ToArray();
+
+                int? materialIndex = simpleMesh.material >= 0 ? simpleMesh.material : null;
+
+                var primitive = new PrimitiveData(vertices, normals, uvs, indices, materialIndex);
+                meshData.Primitives.Add(primitive);
+            }
+
+            int newIndex = sceneData.Meshes.Count;
             sceneData.Meshes.Add(meshData);
-
-            return newMeshIndex;
+            return newIndex;
         }
 
         private Matrix4x4 CreateTransformMatrix(FAFTriMeshData_t triMeshData)
@@ -79,8 +88,11 @@ namespace aogltf
 
             foreach (var mesh in sceneData.Meshes)
             {
-                if (mesh.MaterialIndex.HasValue)
-                    materialIndices.Add(mesh.MaterialIndex.Value);
+                foreach (var prim in mesh.Primitives)
+                {
+                    if (prim.MaterialIndex.HasValue)
+                        materialIndices.Add(prim.MaterialIndex.Value);
+                }
             }
 
             return materialIndices.ToList();

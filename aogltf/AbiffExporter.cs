@@ -78,37 +78,42 @@ namespace aogltf
         {
             var rdbToSceneMaterialMap = new Dictionary<int, int>();
 
-            for (int i = 0; i < sceneData.Meshes.Count; i++)
+            foreach (var mesh in sceneData.Meshes)
             {
-                var mesh = sceneData.Meshes[i];
-
-                if (!mesh.MaterialIndex.HasValue)
-                    continue;
-
-                int rdbMatIndex = mesh.MaterialIndex.Value;
-
-                if (rdbToSceneMaterialMap.TryGetValue(rdbMatIndex, out int sceneMaterialIndex))
+                foreach (var prim in mesh.Primitives)
                 {
-                    mesh.MaterialIndex = sceneMaterialIndex;
-                    continue;
-                }
+                    if (!prim.MaterialIndex.HasValue)
+                        continue;
 
-                int? gltfMatIndex = materialBuilder.ResolveMaterialIndex(rdbMatIndex);
+                    int rdbMatIndex = prim.MaterialIndex.Value;
 
-                if (gltfMatIndex.HasValue)
-                {
-                    var gltfMat = materialBuilder.GetMaterial(gltfMatIndex.Value);
-                    var matData = gltfMat != null ? MaterialData.FromGltfMaterial(gltfMat) : new MaterialData();
-                    int newSceneMaterialIndex = sceneData.Materials.Count;
-                    sceneData.Materials.Add(matData);
-                    rdbToSceneMaterialMap[rdbMatIndex] = newSceneMaterialIndex;
-                    mesh.MaterialIndex = newSceneMaterialIndex;
-                }
-                else
-                {
-                    int fallbackIndex = sceneData.Materials.Count;
-                    sceneData.Materials.Add(new MaterialData());
-                    mesh.MaterialIndex = fallbackIndex;
+                    if (rdbToSceneMaterialMap.TryGetValue(rdbMatIndex, out int sceneMatIndex))
+                    {
+                        prim.MaterialIndex = sceneMatIndex;
+                        continue;
+                    }
+
+                    int? gltfMatIndex = materialBuilder.ResolveMaterialIndex(rdbMatIndex);
+
+                    if (gltfMatIndex.HasValue)
+                    {
+                        var gltfMat = materialBuilder.GetMaterial(gltfMatIndex.Value);
+                        var matData = gltfMat != null
+                            ? MaterialData.FromGltfMaterial(gltfMat)
+                            : new MaterialData();
+
+                        int newSceneMaterialIndex = sceneData.Materials.Count;
+                        sceneData.Materials.Add(matData);
+
+                        rdbToSceneMaterialMap[rdbMatIndex] = newSceneMaterialIndex;
+                        prim.MaterialIndex = newSceneMaterialIndex;
+                    }
+                    else
+                    {
+                        int fallbackIndex = sceneData.Materials.Count;
+                        sceneData.Materials.Add(new MaterialData());
+                        prim.MaterialIndex = fallbackIndex;
+                    }
                 }
             }
         }

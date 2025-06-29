@@ -44,9 +44,9 @@ namespace aogltf
                 {
                     Mesh = nodeData.MeshIndex,
                     Children = nodeData.ChildIndices.Count > 0 ? nodeData.ChildIndices.ToArray() : null,
-                    Translation = nodeData.Translation.HasValue ? nodeData.Translation.Value.ToArray() : null,
-                    Rotation = nodeData.Rotation.HasValue ? nodeData.Rotation.Value.ToArray() : null,
-                    Scale = nodeData.Scale.HasValue ? nodeData.Scale.Value.ToArray() : null,
+                    Translation = nodeData.Translation?.ToArray(),
+                    Rotation = nodeData.Rotation?.ToArray(),
+                    Scale = nodeData.Scale?.ToArray(),
                     Name = nodeData.Name
                 };
             }
@@ -56,13 +56,7 @@ namespace aogltf
 
         private static Scene[] CreateScenes(SceneData sceneData)
         {
-            return
-            [
-                new Scene
-                {
-                    Nodes = new int[] { sceneData.RootNodeIndex }
-                }
-            ];
+            return [new Scene { Nodes = [sceneData.RootNodeIndex] }];
         }
 
         private static Material[] CreateMaterials(MaterialData[] materialDataArray)
@@ -101,32 +95,31 @@ namespace aogltf
             for (int i = 0; i < meshDataArray.Length; i++)
             {
                 var meshData = meshDataArray[i];
-                var attributes = new Dictionary<string, int>
+                var primitives = new Primitive[meshData.Primitives.Count];
+
+                for (int j = 0; j < meshData.Primitives.Count; j++)
                 {
-                    { "POSITION", accessorIndex++ }
-                };
+                    var prim = meshData.Primitives[j];
+                    var attributes = new Dictionary<string, int> { { "POSITION", accessorIndex++ } };
 
-                if (meshData.Normals != null && meshData.Normals.Length > 0)
-                    attributes.Add("NORMAL", accessorIndex++);
+                    if (prim.Normals?.Length > 0)
+                        attributes["NORMAL"] = accessorIndex++;
 
-                if (meshData.UVs != null && meshData.UVs.Length > 0)
-                    attributes.Add("TEXCOORD_0", accessorIndex++);
+                    if (prim.UVs?.Length > 0)
+                        attributes["TEXCOORD_0"] = accessorIndex++;
 
-                int indicesAccessor = accessorIndex++;
+                    int indicesAccessor = accessorIndex++;
 
-                meshes[i] = new Mesh
-                {
-                    Primitives = new[]
+                    primitives[j] = new Primitive
                     {
-                        new Primitive
-                        {
-                            Attributes = attributes,
-                            Indices = indicesAccessor,
-                            Mode = Constants.TRIANGLES,
-                            Material = meshData.MaterialIndex
-                        }
-                    }
-                };
+                        Attributes = attributes,
+                        Indices = indicesAccessor,
+                        Mode = Constants.TRIANGLES,
+                        Material = prim.MaterialIndex
+                    };
+                }
+
+                meshes[i] = new Mesh { Primitives = primitives };
             }
 
             return meshes;
@@ -134,14 +127,7 @@ namespace aogltf
 
         private static Buffer[] CreateBuffers(int binaryBufferLength)
         {
-            return new Buffer[]
-            {
-                new Buffer
-                {
-                    Uri = null,
-                    ByteLength = binaryBufferLength
-                }
-            };
+            return [new Buffer { Uri = null, ByteLength = binaryBufferLength }];
         }
 
         private static BufferView[] CreateBufferViews(BufferLayout layout)
@@ -150,114 +136,104 @@ namespace aogltf
 
             foreach (var meshLayout in layout.MeshLayouts)
             {
-                // Vertex buffer view
-                views.Add(new BufferView
-                {
-                    Buffer = 0,
-                    ByteOffset = meshLayout.VertexSection.Offset,
-                    ByteLength = meshLayout.VertexSection.Length,
-                    Target = Constants.ARRAY_BUFFER
-                });
-
-                // Normal buffer view (if normals exist)
-                if (meshLayout.NormalSection.Length > 0)
+                foreach (var primLayout in meshLayout.Primitives)
                 {
                     views.Add(new BufferView
                     {
                         Buffer = 0,
-                        ByteOffset = meshLayout.NormalSection.Offset,
-                        ByteLength = meshLayout.NormalSection.Length,
+                        ByteOffset = primLayout.VertexSection.Offset,
+                        ByteLength = primLayout.VertexSection.Length,
                         Target = Constants.ARRAY_BUFFER
                     });
-                }
 
-                // UV buffer view (if UVs exist)
-                if (meshLayout.UVSection.Length > 0)
-                {
+                    if (primLayout.NormalSection.Length > 0)
+                        views.Add(new BufferView
+                        {
+                            Buffer = 0,
+                            ByteOffset = primLayout.NormalSection.Offset,
+                            ByteLength = primLayout.NormalSection.Length,
+                            Target = Constants.ARRAY_BUFFER
+                        });
+
+                    if (primLayout.UVSection.Length > 0)
+                        views.Add(new BufferView
+                        {
+                            Buffer = 0,
+                            ByteOffset = primLayout.UVSection.Offset,
+                            ByteLength = primLayout.UVSection.Length,
+                            Target = Constants.ARRAY_BUFFER
+                        });
+
                     views.Add(new BufferView
                     {
                         Buffer = 0,
-                        ByteOffset = meshLayout.UVSection.Offset,
-                        ByteLength = meshLayout.UVSection.Length,
-                        Target = Constants.ARRAY_BUFFER
+                        ByteOffset = primLayout.IndexSection.Offset,
+                        ByteLength = primLayout.IndexSection.Length,
+                        Target = Constants.ELEMENT_ARRAY_BUFFER
                     });
                 }
-
-                // Index buffer view
-                views.Add(new BufferView
-                {
-                    Buffer = 0,
-                    ByteOffset = meshLayout.IndexSection.Offset,
-                    ByteLength = meshLayout.IndexSection.Length,
-                    Target = Constants.ELEMENT_ARRAY_BUFFER
-                });
             }
 
             return views.ToArray();
         }
 
-        private static Accessor[] CreateAccessors(MeshData[] meshDataArray, BufferLayout layout)
+        private static Accessor[] CreateAccessors(MeshData[] meshDataList, BufferLayout layout)
         {
             var accessors = new List<Accessor>();
             int bufferViewIndex = 0;
 
-            foreach (var meshData in meshDataArray)
+            foreach (var meshData in meshDataList)
             {
-                // Position accessor
-                accessors.Add(new Accessor
-                {
-                    BufferView = bufferViewIndex++,
-                    ByteOffset = 0,
-                    ComponentType = Constants.FLOAT,
-                    Count = meshData.Vertices.Length,
-                    Type = "VEC3",
-                    Min = [meshData.Bounds.Min.X, meshData.Bounds.Min.Y, meshData.Bounds.Min.Z],
-                    Max = new[] { meshData.Bounds.Max.X, meshData.Bounds.Max.Y, meshData.Bounds.Max.Z }
-                });
-
-                // Normal accessor (if normals exist)
-                if (meshData.Normals != null && meshData.Normals.Length > 0)
+                foreach (var prim in meshData.Primitives)
                 {
                     accessors.Add(new Accessor
                     {
                         BufferView = bufferViewIndex++,
                         ByteOffset = 0,
                         ComponentType = Constants.FLOAT,
-                        Count = meshData.Normals.Length,
-                        Type = "VEC3"
+                        Count = prim.Vertices.Length,
+                        Type = "VEC3",
+                        Min = [prim.Bounds.Min.X, prim.Bounds.Min.Y, prim.Bounds.Min.Z],
+                        Max = [prim.Bounds.Max.X, prim.Bounds.Max.Y, prim.Bounds.Max.Z]
                     });
-                }
 
-                // UV accessor (if UVs exist)
-                if (meshData.UVs != null && meshData.UVs.Length > 0)
-                {
+                    if (prim.Normals?.Length > 0)
+                        accessors.Add(new Accessor
+                        {
+                            BufferView = bufferViewIndex++,
+                            ByteOffset = 0,
+                            ComponentType = Constants.FLOAT,
+                            Count = prim.Normals.Length,
+                            Type = "VEC3"
+                        });
+
+                    if (prim.UVs?.Length > 0)
+                        accessors.Add(new Accessor
+                        {
+                            BufferView = bufferViewIndex++,
+                            ByteOffset = 0,
+                            ComponentType = Constants.FLOAT,
+                            Count = prim.UVs.Length,
+                            Type = "VEC2"
+                        });
+
                     accessors.Add(new Accessor
                     {
                         BufferView = bufferViewIndex++,
                         ByteOffset = 0,
-                        ComponentType = Constants.FLOAT,
-                        Count = meshData.UVs.Length,
-                        Type = "VEC2"
-                        // Is min/max needed here? (maybe for optimization??)
+                        ComponentType = Constants.UNSIGNED_SHORT,
+                        Count = prim.Indices.Length,
+                        Type = "SCALAR"
                     });
                 }
-
-                // Index accessor
-                accessors.Add(new Accessor
-                {
-                    BufferView = bufferViewIndex++,
-                    ByteOffset = 0,
-                    ComponentType = Constants.UNSIGNED_SHORT,
-                    Count = meshData.Indices.Length,
-                    Type = "SCALAR"
-                });
             }
 
             return accessors.ToArray();
         }
 
+        private readonly record struct PrimitiveLayout(BufferSection VertexSection, BufferSection NormalSection, BufferSection UVSection, BufferSection IndexSection);
         private readonly record struct BufferSection(int Offset, int Length);
-        private readonly record struct MeshLayout(BufferSection VertexSection, BufferSection NormalSection, BufferSection UVSection, BufferSection IndexSection);
+        private readonly record struct MeshLayout(PrimitiveLayout[] Primitives);
         private readonly record struct BufferLayout(MeshLayout[] MeshLayouts);
         private readonly record struct BinaryBufferResult(byte[] Data, BufferLayout Layout);
 
@@ -271,19 +247,21 @@ namespace aogltf
 
                 for (int i = 0; i < meshDataArray.Length; i++)
                 {
-                    var vertexSection = WriteVertexData(writer, meshDataArray[i].Vertices);
-                    AlignStream(writer, 4);
+                    var meshData = meshDataArray[i];
+                    var primLayouts = new PrimitiveLayout[meshData.Primitives.Count];
 
-                    var normalSection = WriteNormalData(writer, meshDataArray[i].Normals);
-                    AlignStream(writer, 4);
+                    for (int j = 0; j < meshData.Primitives.Count; j++)
+                    {
+                        var prim = meshData.Primitives[j];
+                        var v = WriteVertexData(writer, prim.Vertices); AlignStream(writer, 4);
+                        var n = WriteNormalData(writer, prim.Normals); AlignStream(writer, 4);
+                        var u = WriteUVData(writer, prim.UVs); AlignStream(writer, 4);
+                        var iSec = WriteIndexData(writer, prim.Indices); AlignStream(writer, 4);
 
-                    var uvSection = WriteUVData(writer, meshDataArray[i].UVs);
-                    AlignStream(writer, 4);
+                        primLayouts[j] = new PrimitiveLayout(v, n, u, iSec);
+                    }
 
-                    var indexSection = WriteIndexData(writer, meshDataArray[i].Indices);
-                    AlignStream(writer, 4);
-
-                    meshLayouts[i] = new MeshLayout(vertexSection, normalSection, uvSection, indexSection);
+                    meshLayouts[i] = new MeshLayout(primLayouts);
                 }
 
                 return new BinaryBufferResult(stream.ToArray(), new BufferLayout(meshLayouts));
