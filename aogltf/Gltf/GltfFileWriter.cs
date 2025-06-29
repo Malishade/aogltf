@@ -21,8 +21,10 @@ namespace aogltf
             public const int CHUNK_HEADER_SIZE = 8; // length + type
         }
 
-        public static void WriteToFile(string path, Gltf gltf, byte[] bufferData)
+        public static void WriteToFile(string path, Gltf gltf, byte[] bufferData, MaterialBuilder? materialBuilder = null)
         {
+            materialBuilder?.AddToGltf(gltf);
+
             byte[] jsonBytes = SerializeGltfToJson(gltf);
             ValidateGltfData(bufferData, jsonBytes);
 
@@ -36,8 +38,10 @@ namespace aogltf
             WriteBinaryChunk(writer, bufferData, fileSizes.BinChunkSize);
         }
 
-        public static void WriteToFile(string path, Gltf gltf)
+        public static void WriteToFile(string path, Gltf gltf, MaterialBuilder? materialBuilder = null)
         {
+            materialBuilder?.AddToGltf(gltf);
+
             byte[] jsonBytes = SerializeGltfToJson(gltf);
             File.WriteAllBytes(path, jsonBytes);
         }

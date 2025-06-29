@@ -1,6 +1,4 @@
-﻿using AODB;
-using AODB.Common.RDBObjects;
-using System.Numerics;
+﻿using System.Numerics;
 
 namespace aogltf
 {
@@ -23,6 +21,7 @@ namespace aogltf
                 m.values[3, 0], m.values[3, 1], m.values[3, 2], m.values[3, 3]
             );
         }
+
         internal static Vector3 MultiplyPoint(this Matrix4x4 matrix, Vector3 point)
         {
             return new Vector3(

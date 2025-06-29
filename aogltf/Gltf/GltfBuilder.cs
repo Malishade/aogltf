@@ -2,9 +2,6 @@
 
 namespace aogltf
 {
-    /// <summary>
-    /// Builds glTF JSON structures from mesh data and buffer layouts
-    /// </summary>
     internal class GltfBuilder
     {
         private static class Constants
@@ -16,80 +13,84 @@ namespace aogltf
             public const int TRIANGLES = 4;
         }
 
-        public static Gltf Create(ObjectNode rootNode, out byte[] bufferData)
+        public static Gltf Create(SceneData sceneData, out byte[] bufferData)
         {
-            var meshDataList = new List<MeshData>();
-            var nodeDataList = new List<NodeData>();
-
-            CollectMeshesAndNodes(rootNode, meshDataList, nodeDataList, null);
-
-            var bufferResult = BinaryBufferBuilder.CreateBuffer([.. meshDataList]);
+            var bufferResult = BinaryBufferBuilder.CreateBuffer(sceneData.Meshes.ToArray());
             bufferData = bufferResult.Data;
 
             return new Gltf
             {
-                Asset = CreateAsset(),
+                Asset = new Asset(),
                 Buffers = CreateBuffers(bufferResult.Data.Length),
                 BufferViews = CreateBufferViews(bufferResult.Layout),
-                Accessors = CreateAccessors(meshDataList.ToArray(), bufferResult.Layout),
-                Meshes = CreateMeshes(meshDataList.ToArray()),
-                Nodes = CreateNodes(nodeDataList),
-                Scenes = CreateScenes(),
-                Scene = 0
+                Accessors = CreateAccessors(sceneData.Meshes.ToArray(), bufferResult.Layout),
+                Materials = CreateMaterials(sceneData.Materials.ToArray()),
+                Meshes = CreateMeshes(sceneData.Meshes.ToArray()),
+                Nodes = CreateNodes(sceneData),
+                Scenes = CreateScenes(sceneData),
+                Scene = 0,
             };
         }
 
-        private static void CollectMeshesAndNodes(ObjectNode obj, List<MeshData> meshes, List<NodeData> nodes, int? parentIndex)
+        private static Node[] CreateNodes(SceneData sceneData)
         {
-            int currentNodeIndex = nodes.Count;
+            var gltfNodes = new Node[sceneData.Nodes.Count];
 
-            var nodeData = new NodeData
+            for (int i = 0; i < sceneData.Nodes.Count; i++)
             {
-                MeshIndex = obj.MeshData != null ? meshes.Count : null,
-                Translation = obj.Translation != Vector3.Zero ? obj.Translation : null,
-                Rotation = obj.Rotation != Quaternion.Identity ? obj.Rotation : null,
-                Scale = obj.Scale != Vector3.One ? obj.Scale : null,
-                Name = obj.Name,
-                Children = new List<int>()
-            };
+                var nodeData = sceneData.Nodes[i];
 
-            if (obj.MeshData != null)
-            {
-                meshes.Add(obj.MeshData);
-            }
-
-            nodes.Add(nodeData);
-
-            if (parentIndex.HasValue)
-            {
-                nodes[parentIndex.Value].Children.Add(currentNodeIndex);
-            }
-
-            foreach (var child in obj.Children)
-            {
-                CollectMeshesAndNodes(child, meshes, nodes, currentNodeIndex);
-            }
-        }
-
-        private static Node[] CreateNodes(List<NodeData> nodeDataList)
-        {
-            var nodes = new Node[nodeDataList.Count];
-
-            for (int i = 0; i < nodeDataList.Count; i++)
-            {
-                var nodeData = nodeDataList[i];
-                nodes[i] = new Node
+                gltfNodes[i] = new Node
                 {
                     Mesh = nodeData.MeshIndex,
-                    Children = nodeData.Children.Count > 0 ? nodeData.Children.ToArray() : null,
-                    Translation = nodeData.Translation?.ToArray(),
-                    Rotation = nodeData.Rotation?.ToArray(),
-                    Scale = nodeData.Scale?.ToArray(),
+                    Children = nodeData.ChildIndices.Count > 0 ? nodeData.ChildIndices.ToArray() : null,
+                    Translation = nodeData.Translation.HasValue ? nodeData.Translation.Value.ToArray() : null,
+                    Rotation = nodeData.Rotation.HasValue ? nodeData.Rotation.Value.ToArray() : null,
+                    Scale = nodeData.Scale.HasValue ? nodeData.Scale.Value.ToArray() : null,
                     Name = nodeData.Name
                 };
             }
 
-            return nodes;
+            return gltfNodes;
+        }
+
+        private static Scene[] CreateScenes(SceneData sceneData)
+        {
+            return
+            [
+                new Scene
+                {
+                    Nodes = new int[] { sceneData.RootNodeIndex }
+                }
+            ];
+        }
+
+        private static Material[] CreateMaterials(MaterialData[] materialDataArray)
+        {
+            var materials = new Material[materialDataArray.Length];
+
+            for (int i = 0; i < materialDataArray.Length; i++)
+            {
+                var data = materialDataArray[i];
+                materials[i] = new Material
+                {
+                    Name = data.Name,
+                    PbrMetallicRoughness = new PbrMetallicRoughness
+                    {
+                        BaseColorFactor = data.BaseColor.HasValue ? [data.BaseColor.Value.X, data.BaseColor.Value.Y, data.BaseColor.Value.Z, data.BaseColor.Value.W] : null,
+                        MetallicFactor = data.MetallicFactor,
+                        RoughnessFactor = data.RoughnessFactor,
+                        BaseColorTexture = data.BaseColorTextureIndex.HasValue ? new TextureInfo { Index = data.BaseColorTextureIndex.Value } : null
+                    },
+                    NormalTexture = data.NormalTextureIndex.HasValue ? new NormalTextureInfo { Index = data.NormalTextureIndex.Value } : null,
+                    EmissiveFactor = data.EmissiveFactor?.ToArray(),
+                    AlphaMode = data.AlphaMode,
+                    AlphaCutoff = data.AlphaCutoff,
+                    DoubleSided = data.DoubleSided
+                };
+            }
+
+            return materials;
         }
 
         private static Mesh[] CreateMeshes(MeshData[] meshDataArray)
@@ -100,65 +101,55 @@ namespace aogltf
             for (int i = 0; i < meshDataArray.Length; i++)
             {
                 var meshData = meshDataArray[i];
-
-                // Position index accessor
                 var attributes = new Dictionary<string, int>
                 {
                     { "POSITION", accessorIndex++ }
                 };
 
-                // Normal index accessor (if normals exist)
                 if (meshData.Normals != null && meshData.Normals.Length > 0)
-                {
                     attributes.Add("NORMAL", accessorIndex++);
-                }
 
-                // UV index accessor (if UVs exist)
                 if (meshData.UVs != null && meshData.UVs.Length > 0)
-                {
                     attributes.Add("TEXCOORD_0", accessorIndex++);
-                }
 
-                var indicesAccessor = accessorIndex++;
+                int indicesAccessor = accessorIndex++;
 
                 meshes[i] = new Mesh
                 {
-                    Primitives = [
+                    Primitives = new[]
+                    {
                         new Primitive
                         {
                             Attributes = attributes,
                             Indices = indicesAccessor,
-                            Mode = Constants.TRIANGLES
+                            Mode = Constants.TRIANGLES,
+                            Material = meshData.MaterialIndex
                         }
-                    ]
+                    }
                 };
             }
+
             return meshes;
         }
 
-
-        private class NodeData
+        private static Buffer[] CreateBuffers(int binaryBufferLength)
         {
-            public int? MeshIndex { get; set; }
-            public Vector3? Translation { get; set; }
-            public Quaternion? Rotation { get; set; }
-            public Vector3? Scale { get; set; }
-            public string? Name { get; set; }
-            public List<int> Children { get; set; } = new();
+            return new Buffer[]
+            {
+                new Buffer
+                {
+                    Uri = null,
+                    ByteLength = binaryBufferLength
+                }
+            };
         }
-
-        private static Asset CreateAsset() => new Asset();
-
-        private static Buffer[] CreateBuffers(int binaryBufferLength) => [new Buffer { Uri = null, ByteLength = binaryBufferLength }];
 
         private static BufferView[] CreateBufferViews(BufferLayout layout)
         {
             var views = new List<BufferView>();
 
-            for (int i = 0; i < layout.MeshLayouts.Length; i++)
+            foreach (var meshLayout in layout.MeshLayouts)
             {
-                var meshLayout = layout.MeshLayouts[i];
-
                 // Vertex buffer view
                 views.Add(new BufferView
                 {
@@ -192,7 +183,6 @@ namespace aogltf
                     });
                 }
 
-
                 // Index buffer view
                 views.Add(new BufferView
                 {
@@ -211,10 +201,8 @@ namespace aogltf
             var accessors = new List<Accessor>();
             int bufferViewIndex = 0;
 
-            for (int i = 0; i < meshDataArray.Length; i++)
+            foreach (var meshData in meshDataArray)
             {
-                var meshData = meshDataArray[i];
-
                 // Position accessor
                 accessors.Add(new Accessor
                 {
@@ -224,7 +212,7 @@ namespace aogltf
                     Count = meshData.Vertices.Length,
                     Type = "VEC3",
                     Min = [meshData.Bounds.Min.X, meshData.Bounds.Min.Y, meshData.Bounds.Min.Z],
-                    Max = [meshData.Bounds.Max.X, meshData.Bounds.Max.Y, meshData.Bounds.Max.Z]
+                    Max = new[] { meshData.Bounds.Max.X, meshData.Bounds.Max.Y, meshData.Bounds.Max.Z }
                 });
 
                 // Normal accessor (if normals exist)
@@ -268,8 +256,6 @@ namespace aogltf
             return accessors.ToArray();
         }
 
-        private static Scene[] CreateScenes() => [new Scene { Nodes = [0] }];
-
         private readonly record struct BufferSection(int Offset, int Length);
         private readonly record struct MeshLayout(BufferSection VertexSection, BufferSection NormalSection, BufferSection UVSection, BufferSection IndexSection);
         private readonly record struct BufferLayout(MeshLayout[] MeshLayouts);
@@ -281,7 +267,6 @@ namespace aogltf
             {
                 using var stream = new MemoryStream();
                 using var writer = new BinaryWriter(stream);
-
                 var meshLayouts = new MeshLayout[meshDataArray.Length];
 
                 for (int i = 0; i < meshDataArray.Length; i++)
@@ -301,65 +286,53 @@ namespace aogltf
                     meshLayouts[i] = new MeshLayout(vertexSection, normalSection, uvSection, indexSection);
                 }
 
-                var layout = new BufferLayout(meshLayouts);
-                var data = stream.ToArray();
-
-                return new BinaryBufferResult(data, layout);
+                return new BinaryBufferResult(stream.ToArray(), new BufferLayout(meshLayouts));
             }
 
             private static BufferSection WriteVertexData(BinaryWriter writer, Vector3[] vertices)
             {
-                int startOffset = (int)writer.BaseStream.Position;
-                foreach (var vertex in vertices)
+                int offset = (int)writer.BaseStream.Position;
+                foreach (var v in vertices)
                 {
-                    writer.Write(vertex.X);
-                    writer.Write(vertex.Y);
-                    writer.Write(vertex.Z);
+                    writer.Write(v.X); writer.Write(v.Y); writer.Write(v.Z);
                 }
-                int length = vertices.Length * sizeof(float) * 3;
-                return new BufferSection(startOffset, length);
-            }
-
-            private static BufferSection WriteUVData(BinaryWriter writer, Vector2[] uvs)
-            {
-                int startOffset = (int)writer.BaseStream.Position;
-                if (uvs != null)
-                {
-                    foreach (var uv in uvs)
-                    {
-                        writer.Write(uv.X);
-                        writer.Write(uv.Y);
-                    }
-                }
-                int length = (uvs?.Length ?? 0) * sizeof(float) * 2;
-                return new BufferSection(startOffset, length);
-            }
-
-            private static BufferSection WriteIndexData(BinaryWriter writer, ushort[] indices)
-            {
-                int startOffset = (int)writer.BaseStream.Position;
-                foreach (var index in indices)
-                {
-                    writer.Write(index);
-                }
-                int length = indices.Length * sizeof(ushort);
-                return new BufferSection(startOffset, length);
+                return new BufferSection(offset, vertices.Length * sizeof(float) * 3);
             }
 
             private static BufferSection WriteNormalData(BinaryWriter writer, Vector3[] normals)
             {
-                int startOffset = (int)writer.BaseStream.Position;
+                int offset = (int)writer.BaseStream.Position;
                 if (normals != null)
                 {
-                    foreach (var normal in normals)
+                    foreach (var n in normals)
                     {
-                        writer.Write(normal.X);
-                        writer.Write(normal.Y);
-                        writer.Write(normal.Z);
+                        writer.Write(n.X); writer.Write(n.Y); writer.Write(n.Z);
                     }
                 }
-                int length = (normals?.Length ?? 0) * sizeof(float) * 3;
-                return new BufferSection(startOffset, length);
+                return new BufferSection(offset, (normals?.Length ?? 0) * sizeof(float) * 3);
+            }
+
+            private static BufferSection WriteUVData(BinaryWriter writer, Vector2[] uvs)
+            {
+                int offset = (int)writer.BaseStream.Position;
+                if (uvs != null)
+                {
+                    foreach (var uv in uvs)
+                    {
+                        writer.Write(uv.X); writer.Write(uv.Y);
+                    }
+                }
+                return new BufferSection(offset, (uvs?.Length ?? 0) * sizeof(float) * 2);
+            }
+
+            private static BufferSection WriteIndexData(BinaryWriter writer, ushort[] indices)
+            {
+                int offset = (int)writer.BaseStream.Position;
+                foreach (var index in indices)
+                {
+                    writer.Write(index);
+                }
+                return new BufferSection(offset, indices.Length * sizeof(ushort));
             }
 
             private static void AlignStream(BinaryWriter writer, int alignment)
