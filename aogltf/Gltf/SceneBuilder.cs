@@ -29,7 +29,6 @@ namespace aogltf
             var sceneData = new SceneData();
             var nodeMap = new Dictionary<int, int>();
 
-            // First pass: Create all nodes
             for (int i = 0; i < _rdbMesh.Members.Count; i++)
             {
                 NodeData? sceneNode = null;
@@ -57,6 +56,7 @@ namespace aogltf
             }
 
             BuildHierarchy(sceneData, nodeMap);
+            BuildAnimations(sceneData, nodeMap);
 
             sceneData.RootNodeIndex = FindRootNode(sceneData, nodeMap);
 
@@ -72,8 +72,7 @@ namespace aogltf
 
             if (refFrame.anim_matrix.values != null)
             {
-                var matrix = refFrame.anim_matrix.ToNumerics() *
-                           ((Transform)_rdbMesh.Members[0]).anim_matrix.ToNumerics();
+                var matrix = refFrame.anim_matrix.ToNumerics() *((Transform)_rdbMesh.Members[0]).anim_matrix.ToNumerics();
 
                 Matrix4x4.Decompose(matrix, out Vector3 scale, out Quaternion rotation, out Vector3 translation);
 
@@ -129,6 +128,103 @@ namespace aogltf
                     }
                 }
             }
+        }
+
+        private void BuildAnimations(SceneData sceneData, Dictionary<int, int> nodeMap)
+        {
+            var masterAnimation = new AnimationData { Name = "Animation" };
+            float maxDuration = 0f;
+
+            for (int i = 0; i < _rdbMesh.Members.Count; i++)
+            {
+                if (_rdbMesh.Members[i] is RTriMesh_t triMesh && nodeMap.TryGetValue(i, out int nodeIndex))
+                {
+                    var animData = ExtractAnimationData(triMesh, nodeIndex);
+                    if (animData != null)
+                    {
+                        sceneData.Nodes[nodeIndex].HasAnimation = true;
+                        masterAnimation.Channels.AddRange(animData.Channels);
+                        maxDuration = Math.Max(maxDuration, animData.Duration);
+                    }
+                }
+            }
+
+            if (masterAnimation.Channels.Count > 0)
+            {
+                masterAnimation.Duration = maxDuration;
+                sceneData.Animations.Add(masterAnimation);
+            }
+        }
+
+        private AnimationData? ExtractAnimationData(RTriMesh_t triMesh, int nodeIndex)
+        {
+            if (triMesh.anim == -1)
+                return null;
+
+            if (_rdbMesh.Members[triMesh.anim] is not FAFAnim_t animClass)
+                return null;
+
+            // Skip single keyframe animations
+            if (animClass.num_trans_keys <= 1 && animClass.num_rot_keys <= 1)
+                return null;
+
+            var animData = new AnimationData
+            {
+                Name = $"Animation_{nodeIndex}"
+            };
+
+            float maxTime = 0f;
+
+            if (animClass.num_rot_keys > 1 && animClass.RotKeys != null)
+            {
+                var rotationChannel = new AnimationChannelData
+                {
+                    NodeIndex = nodeIndex,
+                    Path = "rotation"
+                };
+
+                foreach (var rotKey in animClass.RotKeys)
+                {
+                    var combinedRotation = rotKey.Rotation.ToNumerics() * triMesh.local_rot.ToNumerics();
+                    rotationChannel.Keyframes.Add(new KeyframeData(rotKey.Time, [combinedRotation.X, combinedRotation.Y, combinedRotation.Z, combinedRotation.W]));
+                    maxTime = Math.Max(maxTime, rotKey.Time);
+                }
+
+                if (rotationChannel.Keyframes.Count > 0)
+                    animData.Channels.Add(rotationChannel);
+            }
+
+            if (animClass.num_trans_keys > 1 && animClass.TransKeys != null)
+            {
+                var translationChannel = new AnimationChannelData
+                {
+                    NodeIndex = nodeIndex,
+                    Path = "translation"
+                };
+
+                foreach (var transKey in animClass.TransKeys)
+                {
+                    var combinedTranslation = transKey.Translation.ToNumerics() + triMesh.local_pos.ToNumerics();
+                    translationChannel.Keyframes.Add(new KeyframeData(transKey.Time, [combinedTranslation.X, combinedTranslation.Y, combinedTranslation.Z]));
+                    maxTime = Math.Max(maxTime, transKey.Time);
+                }
+
+                if (translationChannel.Keyframes.Count > 0)
+                    animData.Channels.Add(translationChannel);
+            }
+
+            // Add scale channel with single keyframe
+            var scaleChannel = new AnimationChannelData
+            {
+                NodeIndex = nodeIndex,
+                Path = "scale"
+            };
+
+            scaleChannel.Keyframes.Add(new KeyframeData(0f, [1f, 1f, 1f]));
+            animData.Channels.Add(scaleChannel);
+            animData.Duration = maxTime;
+
+            return animData.Channels.Count > 0 ? animData : null;
         }
 
         private int FindRootNode(SceneData sceneData, Dictionary<int, int> nodeMap)

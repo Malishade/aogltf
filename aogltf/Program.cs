@@ -11,7 +11,7 @@ namespace aogltf
 
         private static void AOExportTest()
         {
-            int modelId = 283378;
+            int modelId = 289814; //Rollerrat in a Cage
             string aoPath = "D:\\Funcom\\Anarchy Online";
             AbiffExporter testExport = new AbiffExporter(new RdbController(aoPath));
             string desktopPath = Environment.GetFolderPath(Environment.SpecialFolder.Desktop);

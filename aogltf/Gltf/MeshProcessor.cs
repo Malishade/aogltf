@@ -20,7 +20,7 @@ namespace aogltf
                 NodeData node = sceneData.Nodes[i];
                 if (node.SourceMeshIndex.HasValue)
                 {
-                    var meshIndex = CreateMeshData(node.SourceMeshIndex.Value, sceneData);
+                    var meshIndex = CreateMeshData(node.SourceMeshIndex.Value, sceneData, node.HasAnimation);
                     if (meshIndex.HasValue)
                     {
                         node.MeshIndex = meshIndex;
@@ -29,7 +29,7 @@ namespace aogltf
             }
         }
 
-        private int? CreateMeshData(int sourceMeshIndex, SceneData sceneData)
+        private int? CreateMeshData(int sourceMeshIndex, SceneData sceneData, bool hasAnimation)
         {
             if (_rdbMesh.Members[sourceMeshIndex] is not FAFTriMeshData_t triMeshData)
                 return null;
@@ -42,11 +42,23 @@ namespace aogltf
                     _rdbMesh.Members[simpleMesh.trilist] is not TriList triList)
                     continue;
 
-                Matrix4x4 transform = CreateTransformMatrix(triMeshData);
+                Vector3[] vertices;
 
-                var vertices = simpleMesh.Vertices
-                    .Select(v => transform.MultiplyPoint(v.Position.ToNumerics()))
-                    .ToArray();
+                // Only apply transform if there are no animations
+                if (!hasAnimation)
+                {
+                    Matrix4x4 transform = CreateTransformMatrix(triMeshData);
+                    vertices = simpleMesh.Vertices
+                        .Select(v => transform.MultiplyPoint(v.Position.ToNumerics()))
+                        .ToArray();
+                }
+                else
+                {
+                    // If animated, use vertices as-is (transform will be handled by animation)
+                    vertices = simpleMesh.Vertices
+                        .Select(v => v.Position.ToNumerics())
+                        .ToArray();
+                }
 
                 var normals = simpleMesh.Vertices
                     .Select(v => v.Normal.ToNumerics())

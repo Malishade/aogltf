@@ -15,7 +15,7 @@ namespace aogltf
 
         public static Gltf Create(SceneData sceneData, out byte[] bufferData)
         {
-            var bufferResult = BinaryBufferBuilder.CreateBuffer(sceneData.Meshes.ToArray());
+            var bufferResult = BinaryBufferBuilder.CreateBuffer(sceneData.Meshes.ToArray(), sceneData.Animations.ToArray());
             bufferData = bufferResult.Data;
 
             return new Gltf
@@ -23,13 +23,87 @@ namespace aogltf
                 Asset = new Asset(),
                 Buffers = CreateBuffers(bufferResult.Data.Length),
                 BufferViews = CreateBufferViews(bufferResult.Layout),
-                Accessors = CreateAccessors(sceneData.Meshes.ToArray(), bufferResult.Layout),
+                Accessors = CreateAccessors(sceneData.Meshes.ToArray(), sceneData.Animations.ToArray(), bufferResult.Layout),
                 Materials = CreateMaterials(sceneData.Materials.ToArray()),
                 Meshes = CreateMeshes(sceneData.Meshes.ToArray()),
                 Nodes = CreateNodes(sceneData),
                 Scenes = CreateScenes(sceneData),
                 Scene = 0,
+                Animations = sceneData.Animations.Count > 0 ? CreateAnimations(sceneData.Animations.ToArray(), sceneData.Meshes.ToArray()) : null
             };
+        }
+
+        private static Animation[] CreateAnimations(AnimationData[] animationDataArray, MeshData[] meshDataArray)
+        {
+            var animations = new Animation[animationDataArray.Length];
+            int accessorIndex = CalculateMeshAccessorCount(meshDataArray);
+
+            for (int i = 0; i < animationDataArray.Length; i++)
+            {
+                var animData = animationDataArray[i];
+                var channels = new List<AnimationChannel>();
+                var samplers = new List<AnimationSampler>();
+
+                foreach (var channelData in animData.Channels)
+                {
+                    if (channelData.Keyframes.Count == 0)
+                        continue;
+
+                    int inputAccessor = accessorIndex++;
+                    int outputAccessor = accessorIndex++;
+
+                    channels.Add(new AnimationChannel
+                    {
+                        Sampler = samplers.Count,
+                        Target = new AnimationTarget
+                        {
+                            Node = channelData.NodeIndex,
+                            Path = channelData.Path
+                        }
+                    });
+
+                    samplers.Add(new AnimationSampler
+                    {
+                        Input = inputAccessor,
+                        Output = outputAccessor,
+                        Interpolation = channelData.Interpolation
+                    });
+                }
+
+                animations[i] = new Animation
+                {
+                    Name = animData.Name,
+                    Channels = [.. channels],
+                    Samplers = [.. samplers]
+                };
+            }
+
+            return animations;
+        }
+
+        private static int CalculateMeshAccessorCount(MeshData[] meshDataArray)
+        {
+            int count = 0;
+            foreach (var meshData in meshDataArray)
+            {
+                foreach (var primitive in meshData.Primitives)
+                {
+                    // Position accessor (always present)
+                    count++;
+
+                    // Normal accessor (if normals exist)
+                    if (primitive.Normals?.Length > 0)
+                        count++;
+
+                    // UV accessor (if UVs exist)
+                    if (primitive.UVs?.Length > 0)
+                        count++;
+
+                    // Index accessor (always present)
+                    count++;
+                }
+            }
+            return count;
         }
 
         private static Node[] CreateNodes(SceneData sceneData)
@@ -134,6 +208,7 @@ namespace aogltf
         {
             var views = new List<BufferView>();
 
+            // Add mesh buffer views
             foreach (var meshLayout in layout.MeshLayouts)
             {
                 foreach (var primLayout in meshLayout.Primitives)
@@ -174,18 +249,43 @@ namespace aogltf
                 }
             }
 
-            return views.ToArray();
+            // Add animation buffer views
+            foreach (var animLayout in layout.AnimationLayouts)
+            {
+                foreach (var channelLayout in animLayout.Channels)
+                {
+                    views.Add(new BufferView
+                    {
+                        Buffer = 0,
+                        ByteOffset = channelLayout.TimeSection.Offset,
+                        ByteLength = channelLayout.TimeSection.Length,
+                        Target = Constants.ARRAY_BUFFER
+                    });
+
+                    views.Add(new BufferView
+                    {
+                        Buffer = 0,
+                        ByteOffset = channelLayout.ValueSection.Offset,
+                        ByteLength = channelLayout.ValueSection.Length,
+                        Target = Constants.ARRAY_BUFFER
+                    });
+                }
+            }
+
+            return [.. views];
         }
 
-        private static Accessor[] CreateAccessors(MeshData[] meshDataList, BufferLayout layout)
+        private static Accessor[] CreateAccessors(MeshData[] meshDataList, AnimationData[] animationDataList, BufferLayout layout)
         {
             var accessors = new List<Accessor>();
             int bufferViewIndex = 0;
 
+            // Create mesh accessors
             foreach (var meshData in meshDataList)
             {
                 foreach (var prim in meshData.Primitives)
                 {
+                    // Position accessor
                     accessors.Add(new Accessor
                     {
                         BufferView = bufferViewIndex++,
@@ -197,6 +297,7 @@ namespace aogltf
                         Max = [prim.Bounds.Max.X, prim.Bounds.Max.Y, prim.Bounds.Max.Z]
                     });
 
+                    // Normal accessor
                     if (prim.Normals?.Length > 0)
                         accessors.Add(new Accessor
                         {
@@ -207,6 +308,7 @@ namespace aogltf
                             Type = "VEC3"
                         });
 
+                    // UV accessor
                     if (prim.UVs?.Length > 0)
                         accessors.Add(new Accessor
                         {
@@ -217,6 +319,7 @@ namespace aogltf
                             Type = "VEC2"
                         });
 
+                    // Index accessor
                     accessors.Add(new Accessor
                     {
                         BufferView = bufferViewIndex++,
@@ -228,23 +331,66 @@ namespace aogltf
                 }
             }
 
-            return accessors.ToArray();
+            // Create animation accessors
+            foreach (var animData in animationDataList)
+            {
+                foreach (var channelData in animData.Channels)
+                {
+                    if (channelData.Keyframes.Count == 0)
+                        continue;
+
+                    // Time accessor (input)
+                    accessors.Add(new Accessor
+                    {
+                        BufferView = bufferViewIndex++,
+                        ByteOffset = 0,
+                        ComponentType = Constants.FLOAT,
+                        Count = channelData.Keyframes.Count,
+                        Type = "SCALAR",
+                        Min = [channelData.Keyframes.Min(k => k.Time)],
+                        Max = [channelData.Keyframes.Max(k => k.Time)]
+                    });
+
+                    // Value accessor (output)
+                    string accessorType = channelData.Path switch
+                    {
+                        "translation" => "VEC3",
+                        "rotation" => "VEC4",
+                        "scale" => "VEC3",
+                        _ => "VEC3"
+                    };
+
+                    accessors.Add(new Accessor
+                    {
+                        BufferView = bufferViewIndex++,
+                        ByteOffset = 0,
+                        ComponentType = Constants.FLOAT,
+                        Count = channelData.Keyframes.Count,
+                        Type = accessorType
+                    });
+                }
+            }
+
+            return [.. accessors];
         }
 
         private readonly record struct PrimitiveLayout(BufferSection VertexSection, BufferSection NormalSection, BufferSection UVSection, BufferSection IndexSection);
         private readonly record struct BufferSection(int Offset, int Length);
         private readonly record struct MeshLayout(PrimitiveLayout[] Primitives);
-        private readonly record struct BufferLayout(MeshLayout[] MeshLayouts);
+        private readonly record struct AnimationChannelLayout(BufferSection TimeSection, BufferSection ValueSection);
+        private readonly record struct AnimationLayout(AnimationChannelLayout[] Channels);
+        private readonly record struct BufferLayout(MeshLayout[] MeshLayouts, AnimationLayout[] AnimationLayouts);
         private readonly record struct BinaryBufferResult(byte[] Data, BufferLayout Layout);
 
         private class BinaryBufferBuilder
         {
-            internal static BinaryBufferResult CreateBuffer(MeshData[] meshDataArray)
+            internal static BinaryBufferResult CreateBuffer(MeshData[] meshDataArray, AnimationData[] animationDataArray)
             {
                 using var stream = new MemoryStream();
                 using var writer = new BinaryWriter(stream);
-                var meshLayouts = new MeshLayout[meshDataArray.Length];
 
+                // Write mesh data
+                var meshLayouts = new MeshLayout[meshDataArray.Length];
                 for (int i = 0; i < meshDataArray.Length; i++)
                 {
                     var meshData = meshDataArray[i];
@@ -253,10 +399,14 @@ namespace aogltf
                     for (int j = 0; j < meshData.Primitives.Count; j++)
                     {
                         var prim = meshData.Primitives[j];
-                        var v = WriteVertexData(writer, prim.Vertices); AlignStream(writer, 4);
-                        var n = WriteNormalData(writer, prim.Normals); AlignStream(writer, 4);
-                        var u = WriteUVData(writer, prim.UVs); AlignStream(writer, 4);
-                        var iSec = WriteIndexData(writer, prim.Indices); AlignStream(writer, 4);
+                        var v = WriteVertexData(writer, prim.Vertices); 
+                        AlignStream(writer, 4);
+                        var n = WriteNormalData(writer, prim.Normals); 
+                        AlignStream(writer, 4);
+                        var u = WriteUVData(writer, prim.UVs); 
+                        AlignStream(writer, 4);
+                        var iSec = WriteIndexData(writer, prim.Indices); 
+                        AlignStream(writer, 4);
 
                         primLayouts[j] = new PrimitiveLayout(v, n, u, iSec);
                     }
@@ -264,7 +414,30 @@ namespace aogltf
                     meshLayouts[i] = new MeshLayout(primLayouts);
                 }
 
-                return new BinaryBufferResult(stream.ToArray(), new BufferLayout(meshLayouts));
+                // Write animation data
+                var animLayouts = new AnimationLayout[animationDataArray.Length];
+                for (int i = 0; i < animationDataArray.Length; i++)
+                {
+                    var animData = animationDataArray[i];
+                    var channelLayouts = new List<AnimationChannelLayout>();
+
+                    foreach (var channelData in animData.Channels)
+                    {
+                        if (channelData.Keyframes.Count == 0)
+                            continue;
+
+                        var timeSection = WriteTimeData(writer, channelData.Keyframes); 
+                        AlignStream(writer, 4);
+                        var valueSection = WriteValueData(writer, channelData.Keyframes, channelData.Path); 
+                        AlignStream(writer, 4);
+
+                        channelLayouts.Add(new AnimationChannelLayout(timeSection, valueSection));
+                    }
+
+                    animLayouts[i] = new AnimationLayout(channelLayouts.ToArray());
+                }
+
+                return new BinaryBufferResult(stream.ToArray(), new BufferLayout(meshLayouts, animLayouts));
             }
 
             private static BufferSection WriteVertexData(BinaryWriter writer, Vector3[] vertices)
@@ -311,6 +484,38 @@ namespace aogltf
                     writer.Write(index);
                 }
                 return new BufferSection(offset, indices.Length * sizeof(ushort));
+            }
+
+            private static BufferSection WriteTimeData(BinaryWriter writer, List<KeyframeData> keyframes)
+            {
+                int offset = (int)writer.BaseStream.Position;
+                foreach (var keyframe in keyframes)
+                {
+                    writer.Write(keyframe.Time);
+                }
+                return new BufferSection(offset, keyframes.Count * sizeof(float));
+            }
+
+            private static BufferSection WriteValueData(BinaryWriter writer, List<KeyframeData> keyframes, string path)
+            {
+                int offset = (int)writer.BaseStream.Position;
+                int componentCount = path switch
+                {
+                    "translation" => 3,
+                    "rotation" => 4,
+                    "scale" => 3,
+                    _ => 3
+                };
+
+                foreach (var keyframe in keyframes)
+                {
+                    for (int i = 0; i < componentCount && i < keyframe.Value.Length; i++)
+                    {
+                        writer.Write(keyframe.Value[i]);
+                    }
+                }
+
+                return new BufferSection(offset, keyframes.Count * componentCount * sizeof(float));
             }
 
             private static void AlignStream(BinaryWriter writer, int alignment)
