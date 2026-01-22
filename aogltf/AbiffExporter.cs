@@ -1,4 +1,5 @@
 ﻿using AODB;
+using AODB.Common.DbClasses;
 using AODB.Common.RDBObjects;
 using static AODB.Common.DbClasses.RDBMesh_t;
 
@@ -48,9 +49,22 @@ namespace aogltf
             GltfFileWriter.WriteToFile(Path.Combine(outputFolder, $"{objectName}.gltf"), gltf);
         }
 
-        public void ExportGlb(string outputFolder, int meshId)
+        public bool ExportGlb(string outputFolder, int meshId)
         {
-            var rdbMesh = _rdbController.Get<RDBMesh>(meshId).RDBMesh_t;
+            RDBMesh_t? rdbMesh;
+
+            try
+            {
+                rdbMesh = _rdbController.Get<RDBMesh>(meshId)?.RDBMesh_t;
+            }
+            catch
+            {
+                return false;
+            }
+
+            if (rdbMesh == null)
+                return false;
+
             var sceneBuilder = new AbiffSceneBuilder(rdbMesh);
             var meshProcessor = new AbiffMeshProcessor(rdbMesh);
             var objectName = GetInfoObjectName(_rdbController, meshId);
@@ -72,6 +86,7 @@ namespace aogltf
             materialBuilder.AddToGltf(gltf);
 
             GltfFileWriter.WriteToFile(Path.Combine(outputFolder, $"{objectName}.glb"), gltf, bufferData);
+            return true;
         }
 
         private void ConvertAndResolveMaterials(SceneData sceneData, AbiffMaterialBuilder materialBuilder)

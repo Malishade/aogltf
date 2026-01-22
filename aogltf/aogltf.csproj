@@ -8,6 +8,10 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <PackageReference Include="Spectre.Console" Version="0.54.0" />
+  </ItemGroup>
+
+  <ItemGroup>
     <Reference Include="AODB">
       <HintPath>..\..\aodb\AODB\bin\Debug\AODB.dll</HintPath>
     </Reference>
