@@ -4,11 +4,11 @@ using static AODB.Common.DbClasses.RDBMesh_t;
 
 namespace aogltf
 {
-    public class MeshProcessor
+    public class AbiffMeshProcessor
     {
         private readonly RDBMesh_t _rdbMesh;
 
-        public MeshProcessor(RDBMesh_t rdbMesh)
+        public AbiffMeshProcessor(RDBMesh_t rdbMesh)
         {
             _rdbMesh = rdbMesh;
         }
@@ -48,16 +48,12 @@ namespace aogltf
                 if (!hasAnimation)
                 {
                     Matrix4x4 transform = CreateTransformMatrix(triMeshData);
-                    vertices = simpleMesh.Vertices
-                        .Select(v => transform.MultiplyPoint(v.Position.ToNumerics()))
-                        .ToArray();
+                    vertices = [.. simpleMesh.Vertices.Select(v => transform.MultiplyPoint(v.Position.ToNumerics()))];
                 }
                 else
                 {
                     // If animated, use vertices as-is (transform will be handled by animation)
-                    vertices = simpleMesh.Vertices
-                        .Select(v => v.Position.ToNumerics())
-                        .ToArray();
+                    vertices = [.. simpleMesh.Vertices.Select(v => v.Position.ToNumerics())];
                 }
 
                 var normals = simpleMesh.Vertices
@@ -107,7 +103,7 @@ namespace aogltf
                 }
             }
 
-            return materialIndices.ToList();
+            return [.. materialIndices];
         }
     }
 }

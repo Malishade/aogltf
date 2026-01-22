@@ -4,12 +4,12 @@ using static AODB.Common.DbClasses.RDBMesh_t;
 
 namespace aogltf
 {
-    public class SceneBuilder
+    public class AbiffSceneBuilder
     {
         private readonly RDBMesh_t _rdbMesh;
         private readonly Dictionary<string, int> _nameCache = new();
 
-        public SceneBuilder(RDBMesh_t rdbMesh)
+        public AbiffSceneBuilder(RDBMesh_t rdbMesh)
         {
             _rdbMesh = rdbMesh;
         }

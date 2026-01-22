@@ -42,14 +42,16 @@ namespace aogltf
 
         [JsonPropertyName("animations")]
         public Animation[]? Animations { get; set; }
+
+        [JsonPropertyName("skins")]
+        public Skin[]? Skins { get; set; }
     }
 
     public class Asset
     {
         [JsonPropertyName("version")]
-
         public string Version { get; set; } = "2.0";
-       
+
         [JsonPropertyName("generator")]
         public string Generator { get; set; } = "aogltf";
     }
@@ -58,7 +60,7 @@ namespace aogltf
     {
         [JsonPropertyName("uri")]
         public string Uri { get; set; }
-      
+
         [JsonPropertyName("byteLength")]
         public int ByteLength { get; set; }
     }
@@ -67,13 +69,13 @@ namespace aogltf
     {
         [JsonPropertyName("buffer")]
         public int Buffer { get; set; }
-      
+
         [JsonPropertyName("byteOffset")]
         public int ByteOffset { get; set; }
-     
+
         [JsonPropertyName("byteLength")]
         public int ByteLength { get; set; }
-     
+
         [JsonPropertyName("target")]
         public int? Target { get; set; } // 34962 = ARRAY_BUFFER, 34963 = ELEMENT_ARRAY_BUFFER
     }
@@ -82,24 +84,24 @@ namespace aogltf
     {
         [JsonPropertyName("bufferView")]
         public int BufferView { get; set; }
-       
+
         [JsonPropertyName("byteOffset")]
         public int ByteOffset { get; set; } = 0;
-     
+
         [JsonPropertyName("componentType")]
         public int ComponentType { get; set; } // 5126 = FLOAT, 5123 = UNSIGNED_SHORT
-     
+
         [JsonPropertyName("count")]
         public int Count { get; set; }
-     
+
         [JsonPropertyName("type")]
         public string Type { get; set; } // "SCALAR", "VEC3", etc.
-      
+
         [JsonPropertyName("min")]
-        public float[] Min { get; set; }
-      
+        public float[]? Min { get; set; }
+
         [JsonPropertyName("max")]
-        public float[] Max { get; set; }
+        public float[]? Max { get; set; }
     }
 
     public class Mesh
@@ -145,6 +147,9 @@ namespace aogltf
 
         [JsonPropertyName("name")]
         public string? Name { get; set; }
+
+        [JsonPropertyName("skin")]
+        public int? Skin { get; set; } // Reference to skin index for skeletal meshes
     }
 
     public class Scene
@@ -193,6 +198,21 @@ namespace aogltf
 
         [JsonPropertyName("interpolation")]
         public string Interpolation { get; set; } = "LINEAR"; // "LINEAR", "STEP", "CUBICSPLINE"
+    }
+
+    public class Skin
+    {
+        [JsonPropertyName("inverseBindMatrices")]
+        public int? InverseBindMatrices { get; set; } // Accessor index for inverse bind matrices
+
+        [JsonPropertyName("joints")]
+        public int[]? Joints { get; set; } // Node indices that are joints
+
+        [JsonPropertyName("skeleton")]
+        public int? Skeleton { get; set; } // Root joint node index
+
+        [JsonPropertyName("name")]
+        public string? Name { get; set; }
     }
 
     public class Material
@@ -263,6 +283,7 @@ namespace aogltf
         [JsonPropertyName("name")]
         public string? Name { get; set; }
     }
+
     public class NormalTextureInfo : TextureInfo
     {
         [JsonPropertyName("scale")]

@@ -5,7 +5,7 @@ using static AODB.Common.DbClasses.RDBMesh_t;
 
 namespace aogltf
 {
-    public class MaterialBuilder
+    public class AbiffMaterialBuilder
     {
         private readonly List<Material> _materials = new();
         private readonly List<Texture> _textures = new();
@@ -19,7 +19,7 @@ namespace aogltf
         private readonly bool _isGlb;
         private readonly RdbController _rdbController;
 
-        public MaterialBuilder(RdbController controller, RDBMesh_t rdbMesh, string outputPath, bool isGlb)
+        public AbiffMaterialBuilder(RdbController controller, RDBMesh_t rdbMesh, string outputPath, bool isGlb)
         {
             _rdbController = controller;
             _rdbMesh = rdbMesh;

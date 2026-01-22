@@ -16,4 +16,10 @@
     </Reference>
   </ItemGroup>
 
+  <ItemGroup>
+    <None Update="CatMeshToAnimId.bin">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </None>
+  </ItemGroup>
+
 </Project>

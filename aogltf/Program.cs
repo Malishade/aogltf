@@ -11,11 +11,26 @@ namespace aogltf
 
         private static void AOExportTest()
         {
-            int modelId = 289814; //Rollerrat in a Cage
             string aoPath = "D:\\Funcom\\Anarchy Online";
-            AbiffExporter testExport = new AbiffExporter(new RdbController(aoPath));
-            string desktopPath = Environment.GetFolderPath(Environment.SpecialFolder.Desktop);
-            string exportDir = Path.Combine(desktopPath, "AbiffDump");
+            var rdbController = new RdbController(aoPath);
+            //AbiffExport(rdbController);
+            CirExport(rdbController);
+        }
+
+        private static void CirExport(RdbController rdbController)
+        {
+            int modelId = 5927; //soli female
+            CirExporter testExport = new CirExporter(rdbController);
+            string exportDir = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.Desktop), "CirDump");
+            Directory.CreateDirectory(exportDir);
+            testExport.ExportGlb(exportDir, modelId);
+        }
+
+        private static void AbiffExport(RdbController rdbController)
+        {
+            int modelId = 289814; //Rollerrat in a Cage
+            AbiffExporter testExport = new AbiffExporter(rdbController);
+            string exportDir = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.Desktop), "AbiffDump");
             Directory.CreateDirectory(exportDir);
             testExport.ExportGlb(exportDir, modelId);
         }

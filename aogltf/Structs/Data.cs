@@ -8,6 +8,7 @@ namespace aogltf
         public List<MeshData> Meshes { get; set; } = new List<MeshData>();
         public List<MaterialData> Materials { get; set; } = new List<MaterialData>();
         public List<AnimationData> Animations { get; set; } = new List<AnimationData>();
+        public List<SkinData> Skins { get; set; } = new List<SkinData>();
         public int RootNodeIndex { get; set; } = 0;
     }
 
@@ -105,5 +106,25 @@ namespace aogltf
             Time = time;
             Value = value;
         }
+    }
+
+    public class SkeletalPrimitiveData : PrimitiveData
+    {
+        public Vector4[]? Joints { get; set; }
+        public Vector4[]? Weights { get; set; }
+
+        public SkeletalPrimitiveData(Vector3[] vertices, Vector3[] normals, Vector2[] uvs, ushort[] indices, int? materialIndex, Vector4[]? joints, Vector4[]? weights)
+            : base(vertices, normals, uvs, indices, materialIndex)
+        {
+            Joints = joints;
+            Weights = weights;
+        }
+    }
+
+    public class SkinData
+    {
+        public int[] Joints { get; set; }
+        public Matrix4x4[] InverseBindMatrices { get; set; }
+        public int? SkeletonRootNodeIndex { get; set; }
     }
 }

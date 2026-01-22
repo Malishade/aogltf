@@ -10,27 +10,51 @@ namespace aogltf
             public const int ELEMENT_ARRAY_BUFFER = 34963;
             public const int FLOAT = 5126;
             public const int UNSIGNED_SHORT = 5123;
+            public const int UNSIGNED_BYTE = 5121;
             public const int TRIANGLES = 4;
         }
 
         public static Gltf Create(SceneData sceneData, out byte[] bufferData)
         {
-            var bufferResult = BinaryBufferBuilder.CreateBuffer(sceneData.Meshes.ToArray(), sceneData.Animations.ToArray());
+            var bufferResult = BinaryBufferBuilder.CreateBuffer(sceneData.Meshes.ToArray(), sceneData.Animations.ToArray(), sceneData.Skins.ToArray());
             bufferData = bufferResult.Data;
 
-            return new Gltf
+            var gltf = new Gltf
             {
                 Asset = new Asset(),
                 Buffers = CreateBuffers(bufferResult.Data.Length),
                 BufferViews = CreateBufferViews(bufferResult.Layout),
-                Accessors = CreateAccessors(sceneData.Meshes.ToArray(), sceneData.Animations.ToArray(), bufferResult.Layout),
+                Accessors = CreateAccessors(sceneData.Meshes.ToArray(), sceneData.Animations.ToArray(), sceneData.Skins.ToArray(), bufferResult.Layout),
                 Materials = CreateMaterials(sceneData.Materials.ToArray()),
                 Meshes = CreateMeshes(sceneData.Meshes.ToArray()),
                 Nodes = CreateNodes(sceneData),
                 Scenes = CreateScenes(sceneData),
                 Scene = 0,
-                Animations = sceneData.Animations.Count > 0 ? CreateAnimations(sceneData.Animations.ToArray(), sceneData.Meshes.ToArray()) : null
+                Skins = sceneData.Skins.Count > 0 ? CreateSkins(sceneData.Skins.ToArray(), sceneData.Meshes.ToArray(), sceneData.Animations.ToArray()) : null,
+                Animations = sceneData.Animations.Count > 0 ? CreateAnimations(sceneData.Animations.ToArray(), sceneData.Meshes.ToArray()) : null,
             };
+
+            return gltf;
+        }
+
+        private static Skin[] CreateSkins(SkinData[] skinDataArray, MeshData[] meshDataArray, AnimationData[] animationDataArray)
+        {
+            var skins = new Skin[skinDataArray.Length];
+            int accessorIndex = CalculateMeshAccessorCount(meshDataArray) + CalculateAnimationAccessorCount(animationDataArray);
+
+            for (int i = 0; i < skinDataArray.Length; i++)
+            {
+                var skinData = skinDataArray[i];
+                skins[i] = new Skin
+                {
+                    InverseBindMatrices = accessorIndex++,
+                    Joints = skinData.Joints,
+                    Skeleton = skinData.SkeletonRootNodeIndex,
+                    Name = $"Skin_{i}"
+                };
+            }
+
+            return skins;
         }
 
         private static Animation[] CreateAnimations(AnimationData[] animationDataArray, MeshData[] meshDataArray)
@@ -99,8 +123,36 @@ namespace aogltf
                     if (primitive.UVs?.Length > 0)
                         count++;
 
+                    // Skeletal mesh specific accessors
+                    if (primitive is SkeletalPrimitiveData skeletal)
+                    {
+                        // Joints accessor (if joints exist)
+                        if (skeletal.Joints?.Length > 0)
+                            count++;
+
+                        // Weights accessor (if weights exist)
+                        if (skeletal.Weights?.Length > 0)
+                            count++;
+                    }
+
                     // Index accessor (always present)
                     count++;
+                }
+            }
+            return count;
+        }
+
+        private static int CalculateAnimationAccessorCount(AnimationData[] animationDataArray)
+        {
+            int count = 0;
+            foreach (var animData in animationDataArray)
+            {
+                foreach (var channelData in animData.Channels)
+                {
+                    if (channelData.Keyframes.Count > 0)
+                    {
+                        count += 2; // One for input (time), one for output (values)
+                    }
                 }
             }
             return count;
@@ -109,6 +161,26 @@ namespace aogltf
         private static Node[] CreateNodes(SceneData sceneData)
         {
             var gltfNodes = new Node[sceneData.Nodes.Count];
+            var meshToSkinMap = new Dictionary<int, int>();
+
+            // Build a map of which meshes use which skins
+            for (int skinIndex = 0; skinIndex < sceneData.Skins.Count; skinIndex++)
+            {
+                // Find nodes that reference meshes with skeletal primitives
+                for (int nodeIndex = 0; nodeIndex < sceneData.Nodes.Count; nodeIndex++)
+                {
+                    var node = sceneData.Nodes[nodeIndex];
+                    if (node.MeshIndex.HasValue)
+                    {
+                        var mesh = sceneData.Meshes[node.MeshIndex.Value];
+                        bool hasSkeletalPrimitives = mesh.Primitives.Any(prim => prim is SkeletalPrimitiveData);
+                        if (hasSkeletalPrimitives && !meshToSkinMap.ContainsKey(node.MeshIndex.Value))
+                        {
+                            meshToSkinMap[node.MeshIndex.Value] = skinIndex;
+                        }
+                    }
+                }
+            }
 
             for (int i = 0; i < sceneData.Nodes.Count; i++)
             {
@@ -123,6 +195,12 @@ namespace aogltf
                     Scale = nodeData.Scale?.ToArray(),
                     Name = nodeData.Name
                 };
+
+                // Add skin reference if this node has a skeletal mesh
+                if (nodeData.MeshIndex.HasValue && meshToSkinMap.ContainsKey(nodeData.MeshIndex.Value))
+                {
+                    gltfNodes[i].Skin = meshToSkinMap[nodeData.MeshIndex.Value];
+                }
             }
 
             return gltfNodes;
@@ -182,6 +260,16 @@ namespace aogltf
                     if (prim.UVs?.Length > 0)
                         attributes["TEXCOORD_0"] = accessorIndex++;
 
+                    // Add skeletal mesh attributes
+                    if (prim is SkeletalPrimitiveData skeletal)
+                    {
+                        if (skeletal.Joints?.Length > 0)
+                            attributes["JOINTS_0"] = accessorIndex++;
+
+                        if (skeletal.Weights?.Length > 0)
+                            attributes["WEIGHTS_0"] = accessorIndex++;
+                    }
+
                     int indicesAccessor = accessorIndex++;
 
                     primitives[j] = new Primitive
@@ -239,6 +327,25 @@ namespace aogltf
                             Target = Constants.ARRAY_BUFFER
                         });
 
+                    // Add skeletal mesh buffer views
+                    if (primLayout.JointSection.Length > 0)
+                        views.Add(new BufferView
+                        {
+                            Buffer = 0,
+                            ByteOffset = primLayout.JointSection.Offset,
+                            ByteLength = primLayout.JointSection.Length,
+                            Target = Constants.ARRAY_BUFFER
+                        });
+
+                    if (primLayout.WeightSection.Length > 0)
+                        views.Add(new BufferView
+                        {
+                            Buffer = 0,
+                            ByteOffset = primLayout.WeightSection.Offset,
+                            ByteLength = primLayout.WeightSection.Length,
+                            Target = Constants.ARRAY_BUFFER
+                        });
+
                     views.Add(new BufferView
                     {
                         Buffer = 0,
@@ -272,10 +379,22 @@ namespace aogltf
                 }
             }
 
+            // Add skin buffer views
+            foreach (var skinLayout in layout.SkinLayouts)
+            {
+                views.Add(new BufferView
+                {
+                    Buffer = 0,
+                    ByteOffset = skinLayout.InverseBindMatricesSection.Offset,
+                    ByteLength = skinLayout.InverseBindMatricesSection.Length,
+                    Target = Constants.ARRAY_BUFFER
+                });
+            }
+
             return [.. views];
         }
 
-        private static Accessor[] CreateAccessors(MeshData[] meshDataList, AnimationData[] animationDataList, BufferLayout layout)
+        private static Accessor[] CreateAccessors(MeshData[] meshDataList, AnimationData[] animationDataList, SkinData[] skinDataList, BufferLayout layout)
         {
             var accessors = new List<Accessor>();
             int bufferViewIndex = 0;
@@ -318,6 +437,32 @@ namespace aogltf
                             Count = prim.UVs.Length,
                             Type = "VEC2"
                         });
+
+                    // Skeletal mesh accessors
+                    if (prim is SkeletalPrimitiveData skeletal)
+                    {
+                        // Joints accessor
+                        if (skeletal.Joints?.Length > 0)
+                            accessors.Add(new Accessor
+                            {
+                                BufferView = bufferViewIndex++,
+                                ByteOffset = 0,
+                                ComponentType = Constants.UNSIGNED_SHORT,
+                                Count = skeletal.Joints.Length,
+                                Type = "VEC4"
+                            });
+
+                        // Weights accessor
+                        if (skeletal.Weights?.Length > 0)
+                            accessors.Add(new Accessor
+                            {
+                                BufferView = bufferViewIndex++,
+                                ByteOffset = 0,
+                                ComponentType = Constants.FLOAT,
+                                Count = skeletal.Weights.Length,
+                                Type = "VEC4"
+                            });
+                    }
 
                     // Index accessor
                     accessors.Add(new Accessor
@@ -371,20 +516,41 @@ namespace aogltf
                 }
             }
 
+            // Create skin accessors
+            foreach (var skinData in skinDataList)
+            {
+                accessors.Add(new Accessor
+                {
+                    BufferView = bufferViewIndex++,
+                    ByteOffset = 0,
+                    ComponentType = Constants.FLOAT,
+                    Count = skinData.InverseBindMatrices.Length,
+                    Type = "MAT4"
+                });
+            }
+
             return [.. accessors];
         }
 
-        private readonly record struct PrimitiveLayout(BufferSection VertexSection, BufferSection NormalSection, BufferSection UVSection, BufferSection IndexSection);
+        private readonly record struct PrimitiveLayout(
+            BufferSection VertexSection,
+            BufferSection NormalSection,
+            BufferSection UVSection,
+            BufferSection JointSection,
+            BufferSection WeightSection,
+            BufferSection IndexSection);
+
         private readonly record struct BufferSection(int Offset, int Length);
         private readonly record struct MeshLayout(PrimitiveLayout[] Primitives);
         private readonly record struct AnimationChannelLayout(BufferSection TimeSection, BufferSection ValueSection);
         private readonly record struct AnimationLayout(AnimationChannelLayout[] Channels);
-        private readonly record struct BufferLayout(MeshLayout[] MeshLayouts, AnimationLayout[] AnimationLayouts);
+        private readonly record struct SkinLayout(BufferSection InverseBindMatricesSection);
+        private readonly record struct BufferLayout(MeshLayout[] MeshLayouts, AnimationLayout[] AnimationLayouts, SkinLayout[] SkinLayouts);
         private readonly record struct BinaryBufferResult(byte[] Data, BufferLayout Layout);
 
         private class BinaryBufferBuilder
         {
-            internal static BinaryBufferResult CreateBuffer(MeshData[] meshDataArray, AnimationData[] animationDataArray)
+            internal static BinaryBufferResult CreateBuffer(MeshData[] meshDataArray, AnimationData[] animationDataArray, SkinData[] skinDataArray)
             {
                 using var stream = new MemoryStream();
                 using var writer = new BinaryWriter(stream);
@@ -399,16 +565,28 @@ namespace aogltf
                     for (int j = 0; j < meshData.Primitives.Count; j++)
                     {
                         var prim = meshData.Primitives[j];
-                        var v = WriteVertexData(writer, prim.Vertices); 
+                        var v = WriteVertexData(writer, prim.Vertices);
                         AlignStream(writer, 4);
-                        var n = WriteNormalData(writer, prim.Normals); 
+                        var n = WriteNormalData(writer, prim.Normals);
                         AlignStream(writer, 4);
-                        var u = WriteUVData(writer, prim.UVs); 
-                        AlignStream(writer, 4);
-                        var iSec = WriteIndexData(writer, prim.Indices); 
+                        var u = WriteUVData(writer, prim.UVs);
                         AlignStream(writer, 4);
 
-                        primLayouts[j] = new PrimitiveLayout(v, n, u, iSec);
+                        // Write skeletal mesh data
+                        BufferSection jointSection = default;
+                        BufferSection weightSection = default;
+                        if (prim is SkeletalPrimitiveData skeletal)
+                        {
+                            jointSection = WriteJointData(writer, skeletal.Joints);
+                            AlignStream(writer, 4);
+                            weightSection = WriteWeightData(writer, skeletal.Weights);
+                            AlignStream(writer, 4);
+                        }
+
+                        var iSec = WriteIndexData(writer, prim.Indices);
+                        AlignStream(writer, 4);
+
+                        primLayouts[j] = new PrimitiveLayout(v, n, u, jointSection, weightSection, iSec);
                     }
 
                     meshLayouts[i] = new MeshLayout(primLayouts);
@@ -426,9 +604,9 @@ namespace aogltf
                         if (channelData.Keyframes.Count == 0)
                             continue;
 
-                        var timeSection = WriteTimeData(writer, channelData.Keyframes); 
+                        var timeSection = WriteTimeData(writer, channelData.Keyframes);
                         AlignStream(writer, 4);
-                        var valueSection = WriteValueData(writer, channelData.Keyframes, channelData.Path); 
+                        var valueSection = WriteValueData(writer, channelData.Keyframes, channelData.Path);
                         AlignStream(writer, 4);
 
                         channelLayouts.Add(new AnimationChannelLayout(timeSection, valueSection));
@@ -437,7 +615,18 @@ namespace aogltf
                     animLayouts[i] = new AnimationLayout(channelLayouts.ToArray());
                 }
 
-                return new BinaryBufferResult(stream.ToArray(), new BufferLayout(meshLayouts, animLayouts));
+                // Write skin data
+                var skinLayouts = new SkinLayout[skinDataArray.Length];
+                for (int i = 0; i < skinDataArray.Length; i++)
+                {
+                    var skinData = skinDataArray[i];
+                    var ibmSection = WriteInverseBindMatrices(writer, skinData.InverseBindMatrices);
+                    AlignStream(writer, 4);
+
+                    skinLayouts[i] = new SkinLayout(ibmSection);
+                }
+
+                return new BinaryBufferResult(stream.ToArray(), new BufferLayout(meshLayouts, animLayouts, skinLayouts));
             }
 
             private static BufferSection WriteVertexData(BinaryWriter writer, Vector3[] vertices)
@@ -474,6 +663,39 @@ namespace aogltf
                     }
                 }
                 return new BufferSection(offset, (uvs?.Length ?? 0) * sizeof(float) * 2);
+            }
+
+            private static BufferSection WriteJointData(BinaryWriter writer, Vector4[] joints)
+            {
+                int offset = (int)writer.BaseStream.Position;
+                if (joints != null)
+                {
+                    foreach (var joint in joints)
+                    {
+                        // Convert float joint indices to ushort
+                        writer.Write((ushort)joint.X);
+                        writer.Write((ushort)joint.Y);
+                        writer.Write((ushort)joint.Z);
+                        writer.Write((ushort)joint.W);
+                    }
+                }
+                return new BufferSection(offset, (joints?.Length ?? 0) * sizeof(ushort) * 4);
+            }
+
+            private static BufferSection WriteWeightData(BinaryWriter writer, Vector4[] weights)
+            {
+                int offset = (int)writer.BaseStream.Position;
+                if (weights != null)
+                {
+                    foreach (var weight in weights)
+                    {
+                        writer.Write(weight.X);
+                        writer.Write(weight.Y);
+                        writer.Write(weight.Z);
+                        writer.Write(weight.W);
+                    }
+                }
+                return new BufferSection(offset, (weights?.Length ?? 0) * sizeof(float) * 4);
             }
 
             private static BufferSection WriteIndexData(BinaryWriter writer, ushort[] indices)
@@ -516,6 +738,19 @@ namespace aogltf
                 }
 
                 return new BufferSection(offset, keyframes.Count * componentCount * sizeof(float));
+            }
+
+            private static BufferSection WriteInverseBindMatrices(BinaryWriter writer, Matrix4x4[] matrices)
+            {
+                int offset = (int)writer.BaseStream.Position;
+                foreach (var matrix in matrices)
+                {
+                    writer.Write(matrix.M11); writer.Write(matrix.M12); writer.Write(matrix.M13); writer.Write(matrix.M14);
+                    writer.Write(matrix.M21); writer.Write(matrix.M22); writer.Write(matrix.M23); writer.Write(matrix.M24);
+                    writer.Write(matrix.M31); writer.Write(matrix.M32); writer.Write(matrix.M33); writer.Write(matrix.M34);
+                    writer.Write(matrix.M41); writer.Write(matrix.M42); writer.Write(matrix.M43); writer.Write(matrix.M44);
+                }
+                return new BufferSection(offset, matrices.Length * sizeof(float) * 16);
             }
 
             private static void AlignStream(BinaryWriter writer, int alignment)
