@@ -23,9 +23,6 @@ namespace aogltf
                     .LeftJustified()
                     .Color(Color.Yellow));
 
-            AnsiConsole.WriteLine();
-            AnsiConsole.WriteLine();
-
             string configPath = Path.Combine(AppContext.BaseDirectory, "config.json");
             Config config = LoadConfig(configPath);
 
@@ -34,10 +31,16 @@ namespace aogltf
             {
                 string defaultPath = config.AoPath ?? "";
 
+                AnsiConsole.MarkupLine($"[yellow]Enter path to Anarchy Online installation (or press enter to use last path) [green]({defaultPath})[/]:[/]");
                 aoPath = AnsiConsole.Prompt(
-                    new TextPrompt<string>("[yellow]Enter path to Anarchy Online installation:[/]")
-                        .DefaultValue(defaultPath)
+                    new TextPrompt<string>(string.Empty)
+                        .AllowEmpty()
                         .ValidationErrorMessage("[red]Please enter a valid path[/]"));
+
+                if (string.IsNullOrWhiteSpace(aoPath))
+                {
+                    aoPath = defaultPath;
+                }
 
                 if (Directory.Exists(aoPath))
                 {
@@ -71,6 +74,9 @@ namespace aogltf
 
             while (true)
             {
+                AnsiConsole.WriteLine();
+                AnsiConsole.WriteLine();
+
                 var exportType = AnsiConsole.Prompt(
                     new SelectionPrompt<string>()
                         .Title("[yellow]Select resource database object type:[/]")
