@@ -1,6 +1,6 @@
-﻿using AODB;
-using Spectre.Console;
+﻿using Spectre.Console;
 using System.Text.Json;
+using AODB;
 
 namespace aogltf
 {
