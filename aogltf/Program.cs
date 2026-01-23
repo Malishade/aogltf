@@ -90,17 +90,52 @@ namespace aogltf
                         .Title("[yellow]Select option (ESC to exit):[/]")
                         .HighlightStyle(new Style(foreground: Color.Black, background: Color.Yellow))
                         .EnableSearch()
-                        .AddChoices("CIR Export", "ABIFF Export", "CIR Export (Browser)", "ABIFF Export (Browser)", "<<< Exit >>>"));
+                        .AddChoices("CIR Export", "ABIFF Export", "Dump CIR / ABIFF IDs", "<<< Exit >>>"));
 
                 if (exportType == "<<< Exit >>>")
                     break;
 
-                if (exportType == "CIR Export (Browser)" || exportType == "ABIFF Export (Browser)")
+                if (exportType == "Dump CIR / ABIFF IDs")
+                {
+                    try
+                    {
+                        AnsiConsole.Status()
+                            .Start("Dumping names...", ctx =>
+                            {
+                                ctx.Spinner(Spinner.Known.Dots);
+                                ctx.SpinnerStyle(Style.Parse("yellow"));
+
+                                var names = rdbController.GetNames();
+
+                                File.WriteAllText(Path.Combine(exportDir, "CirNames.json"), JsonSerializer.Serialize(names[AODB.Common.RDBObjects.ResourceTypeId.CatMesh], new JsonSerializerOptions
+                                {
+                                    WriteIndented = true
+                                }));
+
+                                File.WriteAllText(Path.Combine(exportDir, "AbiffNames.json"), JsonSerializer.Serialize(names[AODB.Common.RDBObjects.ResourceTypeId.RdbMesh], new JsonSerializerOptions
+                                {
+                                    WriteIndented = true
+                                }));
+                            });
+
+                        AnsiConsole.MarkupLine($"[green]Names dumped successfully to {Path.Combine(exportDir, "CirNames.json")}[/]");
+                        AnsiConsole.MarkupLine($"[green]Names dumped successfully to {Path.Combine(exportDir, "AbiffNames.json")}[/]");
+                    }
+                    catch (Exception ex)
+                    {
+                        AnsiConsole.MarkupLine($"[red]Dump failed: {ex.Message}[/]");
+                    }
+
+                    AnsiConsole.WriteLine();
+                    continue;
+                }
+
+                if (exportType == "CIR Export" || exportType == "ABIFF Export")
                 {
                     try
                     {
                         var names = rdbController.GetNames();
-                        var resourceType = exportType == "CIR Export (Browser)"
+                        var resourceType = exportType == "CIR Export"
                             ? AODB.Common.RDBObjects.ResourceTypeId.CatMesh
                             : AODB.Common.RDBObjects.ResourceTypeId.RdbMesh;
 
@@ -114,47 +149,6 @@ namespace aogltf
                     }
 
                     continue;
-                }
-
-                AnsiConsole.MarkupLine("[dim]Press ESC to go back[/]");
-                var modelIdInput = PromptWithEscape("[yellow]Enter model ID:[/]");
-
-                if (modelIdInput == null)
-                    continue;
-
-                if (!int.TryParse(modelIdInput, out int modelId) || modelId <= 0)
-                {
-                    AnsiConsole.MarkupLine("[red]Model ID must be a positive number[/]");
-                    continue;
-                }
-
-                try
-                {
-                    bool success = false;
-
-                    AnsiConsole.Status()
-                        .Start($"Exporting model {modelId}...", ctx =>
-                        {
-                            ctx.Spinner(Spinner.Known.Dots);
-                            ctx.SpinnerStyle(Style.Parse("yellow"));
-
-                            if (exportType.StartsWith("CIR"))
-                            {
-                                var exporter = new CirExporter(rdbController);
-                                success = exporter.ExportGlb(exportDir, modelId);
-                            }
-                            else
-                            {
-                                var exporter = new AbiffExporter(rdbController);
-                                success = exporter.ExportGlb(exportDir, modelId);
-                            }
-                        });
-
-                    AnsiConsole.MarkupLine(success ? $"[green]Model exported successfully to {exportDir}[/]" : $"[red]Resource with id {modelId} not found in database / parser error[/]");
-                }
-                catch (Exception ex)
-                {
-                    AnsiConsole.MarkupLine($"[red]Export failed: {ex.Message}[/]");
                 }
 
                 AnsiConsole.WriteLine();
@@ -247,7 +241,7 @@ namespace aogltf
             int selectedIndex = 0;
             int scrollOffset = 0;
             int startLine = Console.CursorTop;
-            const int maxDisplay = 15;
+            const int maxDisplay = 23;
 
             while (true)
             {
@@ -271,7 +265,7 @@ namespace aogltf
                 }
 
                 Console.SetCursorPosition(0, startLine);
-                for (int i = 0; i < maxDisplay + 3; i++)
+                for (int i = 0; i < maxDisplay + 4; i++)
                 {
                     Console.Write(new string(' ', Console.WindowWidth));
                     Console.WriteLine();
@@ -279,6 +273,8 @@ namespace aogltf
                 Console.SetCursorPosition(0, startLine);
 
                 AnsiConsole.MarkupLine($"[yellow]Search:[/] {searchTerm}_");
+                AnsiConsole.WriteLine();
+
                 AnsiConsole.MarkupLine($"[green]Found {filteredModels.Count} model(s)[/]");
 
                 int displayCount = Math.Min(maxDisplay, filteredModels.Count - scrollOffset);
@@ -298,6 +294,7 @@ namespace aogltf
 
                 if (scrollOffset > 0 || filteredModels.Count > scrollOffset + maxDisplay)
                 {
+                    AnsiConsole.WriteLine();
                     string scrollInfo = "";
                     if (scrollOffset > 0)
                         scrollInfo += "[dim]↑ More above[/] ";
@@ -313,7 +310,7 @@ namespace aogltf
                 if (key.Key == ConsoleKey.Escape)
                 {
                     Console.SetCursorPosition(0, startLine);
-                    for (int i = 0; i < maxDisplay + 3; i++)
+                    for (int i = 0; i < maxDisplay + 5; i++)
                     {
                         Console.Write(new string(' ', Console.WindowWidth));
                         Console.WriteLine();
@@ -324,7 +321,7 @@ namespace aogltf
                 else if (key.Key == ConsoleKey.Enter && filteredModels.Count > 0)
                 {
                     Console.SetCursorPosition(0, startLine);
-                    for (int i = 0; i < maxDisplay + 3; i++)
+                    for (int i = 0; i < maxDisplay + 5; i++)
                     {
                         Console.Write(new string(' ', Console.WindowWidth));
                         Console.WriteLine();
@@ -370,7 +367,6 @@ namespace aogltf
                 }
             }
         }
-
         private static Config LoadConfig(string configPath)
         {
             try
