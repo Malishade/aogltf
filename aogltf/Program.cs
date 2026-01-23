@@ -157,44 +157,10 @@ namespace aogltf
             AnsiConsole.MarkupLine("[yellow]Exiting...[/]");
         }
 
-        private static string? PromptWithEscape(string promptText)
-        {
-            var input = "";
-            AnsiConsole.Markup(promptText + " ");
-
-            while (true)
-            {
-                var key = Console.ReadKey(intercept: true);
-
-                if (key.Key == ConsoleKey.Escape)
-                {
-                    AnsiConsole.WriteLine();
-                    return null;
-                }
-                else if (key.Key == ConsoleKey.Enter)
-                {
-                    AnsiConsole.WriteLine();
-                    return input;
-                }
-                else if (key.Key == ConsoleKey.Backspace && input.Length > 0)
-                {
-                    input = input.Substring(0, input.Length - 1);
-                    Console.Write("\b \b");
-                }
-                else if (!char.IsControl(key.KeyChar))
-                {
-                    input += key.KeyChar;
-                    Console.Write(key.KeyChar);
-                }
-            }
-        }
-
         private static void BrowseAndExportModels(Dictionary<int, string> models, RdbController rdbController, string exportDir, bool isCir)
         {
             while (true)
             {
-                AnsiConsole.WriteLine();
-
                 AnsiConsole.MarkupLine("[dim]Type to search, ENTER to select, ESC to return to main menu[/]");
 
                 var searchResult = LiveSearchAndSelect(models);
@@ -241,7 +207,7 @@ namespace aogltf
             int selectedIndex = 0;
             int scrollOffset = 0;
             int startLine = Console.CursorTop;
-            const int maxDisplay = 23;
+            const int maxDisplay = 22;
 
             while (true)
             {
