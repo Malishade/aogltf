@@ -89,7 +89,6 @@ namespace aogltf
                     new SelectionPrompt<string>()
                         .Title("[yellow]Select option (ESC to exit):[/]")
                         .HighlightStyle(new Style(foreground: Color.Black, background: Color.Yellow))
-                        .EnableSearch()
                         .AddChoices("CIR Export", "ABIFF Export", "Dump CIR / ABIFF IDs", "<<< Exit >>>"));
 
                 if (exportType == "<<< Exit >>>")
@@ -208,6 +207,7 @@ namespace aogltf
             int scrollOffset = 0;
             int startLine = Console.CursorTop;
             const int maxDisplay = 22;
+            int previousDisplayCount = 0;
 
             while (true)
             {
@@ -231,7 +231,8 @@ namespace aogltf
                 }
 
                 Console.SetCursorPosition(0, startLine);
-                for (int i = 0; i < maxDisplay + 4; i++)
+                int linesToClear = Math.Max(maxDisplay + 5, previousDisplayCount + 5);
+                for (int i = 0; i < linesToClear; i++)
                 {
                     Console.Write(new string(' ', Console.WindowWidth));
                     Console.WriteLine();
@@ -244,6 +245,9 @@ namespace aogltf
                 AnsiConsole.MarkupLine($"[green]Found {filteredModels.Count} model(s)[/]");
 
                 int displayCount = Math.Min(maxDisplay, filteredModels.Count - scrollOffset);
+
+                int totalLinesDisplayed = 3;
+
                 for (int i = 0; i < displayCount; i++)
                 {
                     int modelIndex = scrollOffset + i;
@@ -256,11 +260,14 @@ namespace aogltf
                     {
                         AnsiConsole.MarkupLine($"  {model.Key} - {model.Value.EscapeMarkup()}");
                     }
+                    totalLinesDisplayed++;
                 }
 
                 if (scrollOffset > 0 || filteredModels.Count > scrollOffset + maxDisplay)
                 {
                     AnsiConsole.WriteLine();
+                    totalLinesDisplayed++;
+
                     string scrollInfo = "";
                     if (scrollOffset > 0)
                         scrollInfo += "[dim]↑ More above[/] ";
@@ -268,15 +275,20 @@ namespace aogltf
                         scrollInfo += $"[dim]↓ More below ({filteredModels.Count - scrollOffset - maxDisplay} more)[/]";
 
                     if (!string.IsNullOrEmpty(scrollInfo))
+                    {
                         AnsiConsole.MarkupLine(scrollInfo);
+                        totalLinesDisplayed++;
+                    }
                 }
+
+                previousDisplayCount = totalLinesDisplayed;
 
                 var key = Console.ReadKey(intercept: true);
 
                 if (key.Key == ConsoleKey.Escape)
                 {
                     Console.SetCursorPosition(0, startLine);
-                    for (int i = 0; i < maxDisplay + 5; i++)
+                    for (int i = 0; i < linesToClear; i++)
                     {
                         Console.Write(new string(' ', Console.WindowWidth));
                         Console.WriteLine();
@@ -287,7 +299,7 @@ namespace aogltf
                 else if (key.Key == ConsoleKey.Enter && filteredModels.Count > 0)
                 {
                     Console.SetCursorPosition(0, startLine);
-                    for (int i = 0; i < maxDisplay + 5; i++)
+                    for (int i = 0; i < linesToClear; i++)
                     {
                         Console.Write(new string(' ', Console.WindowWidth));
                         Console.WriteLine();
@@ -333,6 +345,7 @@ namespace aogltf
                 }
             }
         }
+
         private static Config LoadConfig(string configPath)
         {
             try
