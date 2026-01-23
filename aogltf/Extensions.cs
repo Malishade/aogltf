@@ -51,7 +51,8 @@ namespace aogltf
                     names[resource].Add(rdbMeshKey, name);
                 }
             }
-
+            names[ResourceTypeId.CatMesh] = names[ResourceTypeId.CatMesh].ToDictionary(x => x.Key, y => y.Value.Replace(".cir", ""));
+            names[ResourceTypeId.RdbMesh] = names[ResourceTypeId.RdbMesh].ToDictionary(x => x.Key, y => y.Value.Replace(".abiff", ""));
             return names;
         }
     }
