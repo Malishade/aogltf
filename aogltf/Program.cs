@@ -79,14 +79,14 @@ namespace aogltf
 
                 var exportType = AnsiConsole.Prompt(
                     new SelectionPrompt<string>()
-                        .Title("[yellow]Select resource database object type:[/]")
+                        .Title("[yellow]Select option:[/]")
                         .HighlightStyle(new Style(foreground: Color.Black, background: Color.Yellow))
-                        .AddChoices("CIR", "ABIFF", "Dump Names", "Exit"));
+                        .AddChoices("CIR Export", "ABIFF Export", "Dump CIR / ABIFF IDs", "Exit"));
 
                 if (exportType == "Exit")
                     break;
 
-                if (exportType == "Dump Names")
+                if (exportType == "Dump CIR / ABIFF IDs")
                 {
                     try
                     {
