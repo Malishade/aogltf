@@ -6,9 +6,6 @@
     <Nullable>enable</Nullable>
   </PropertyGroup>
   <ItemGroup>
-    <PackageReference Include="Spectre.Console" Version="0.54.0" />
-  </ItemGroup>
-  <ItemGroup>
     <Reference Include="Libraries\AODB.dll" />
     <Reference Include="Libraries\AODB.Common.dll" />
   </ItemGroup>

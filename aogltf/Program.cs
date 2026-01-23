@@ -1,383 +1,224 @@
-﻿using Spectre.Console;
+﻿using AODB;
+using ConsoleUI;
 using System.Text.Json;
-using AODB;
 
-namespace aogltf
+namespace aogltf;
+
+internal enum ExportOption
 {
-    internal class Program
+    CirExport,
+    AbiffExport,
+    DumpIds,
+    Exit
+}
+
+internal class Program
+{
+    private static string _title = "AO glTF Model Exporter";
+
+    static void Main(string[] args)
     {
-        private class Config
+        Console.WindowHeight = 40;
+        Console.ForegroundColor = ConsoleColor.Yellow;
+        Console.CursorVisible = false;
+        Console.ResetColor();
+
+        string configPath = Path.Combine(AppContext.BaseDirectory, "config.json");
+        Config config = Config.LoadConfig(configPath);
+
+        ConsoleInputPrompt
+            .Create()
+            .WithTitle(_title)
+            .WithPrompt("Anarchy Online installation path:")
+            .WithDefaultValue(config.AoPath)
+            .WithValidator(path =>
+            {
+                if (!Directory.Exists(path))
+                {
+                    return (false, "Directory not found. Please try again.");
+                }
+
+                string rdbPath = Path.Combine(path, "cd_image", "data", "db", "ResourceDatabase.dat");
+
+                if (!File.Exists(rdbPath))
+                {
+                    return (false, $"Directory exists but ResourceDatabase.dat not found");
+                }
+                
+                Console.ForegroundColor = ConsoleColor.Green;
+                Console.ResetColor();
+                return (true, "Success");
+            })
+            .OnInput(aoPath =>
+            {
+                config.AoPath = aoPath;
+                config.SaveConfig(configPath);
+            })
+            .Show();
+
+        var rdbController = new RdbController(config.AoPath!);
+        string exportDir = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.Desktop), "AOExport");
+        Directory.CreateDirectory(exportDir);
+
+        Console.WriteLine();
+        Console.WriteLine();
+        ConsoleSelectionMenu
+            .Create<ExportOption>()
+            .WithBorderWidth(35)
+            .WithItems(Enum.GetValues<ExportOption>())
+            .WithTitle(_title)
+            .WithDisplayFunc(opt => opt switch
+            {
+                ExportOption.CirExport => "CIR Export",
+                ExportOption.AbiffExport => "ABIFF Export",
+                ExportOption.DumpIds => "Dump CIR / ABIFF IDs",
+                ExportOption.Exit => "Exit",
+                _ => opt.ToString()
+            })
+            .WithLoop()
+            .OnSelect(exportType =>
+            {
+                switch (exportType)
+                {
+                    case ExportOption.Exit:
+                        return false;
+                    case ExportOption.DumpIds:
+                        DumpNames(rdbController, exportDir);
+                        return true;
+                    case ExportOption.CirExport:
+                        HandleBrowser(rdbController, exportDir, true);
+                        return true;
+                    case ExportOption.AbiffExport:
+                        HandleBrowser(rdbController, exportDir, false);
+                        return true;
+                    default:
+                        return true;
+                }
+            })
+            .Show();
+
+        Console.ForegroundColor = ConsoleColor.Yellow;
+        Console.WriteLine("Exiting...");
+        Console.ResetColor();
+    }
+
+    private static void DumpNames(RdbController rdbController, string exportDir)
+    {
+        try
         {
-            public string? AoPath { get; set; }
-        }
+            Console.ForegroundColor = ConsoleColor.Yellow;
+            Console.WriteLine("Dumping names...");
+            Console.ResetColor();
 
-        static void Main(string[] args)
-        {
-            Console.CancelKeyPress += (sender, e) =>
-            {
-                if (e.SpecialKey == ConsoleSpecialKey.ControlC)
-                {
-                    e.Cancel = true;
-                }
-            };
+            var names = rdbController.GetNames();
 
-            AnsiConsole.Write(
-                new FigletText("AO glTF")
-                    .LeftJustified()
-                    .Color(Color.Yellow));
-
-            AnsiConsole.Write(
-                new FigletText("Model Export")
-                    .LeftJustified()
-                    .Color(Color.Yellow));
-
-            string configPath = Path.Combine(AppContext.BaseDirectory, "config.json");
-            Config config = LoadConfig(configPath);
-
-            string aoPath;
-            while (true)
-            {
-                string defaultPath = config.AoPath ?? "";
-
-                AnsiConsole.MarkupLine($"[yellow]Enter path to Anarchy Online installation (or press enter to use last path) [green]({defaultPath})[/]:[/]");
-                aoPath = AnsiConsole.Prompt(
-                    new TextPrompt<string>(string.Empty)
-                        .AllowEmpty()
-                        .ValidationErrorMessage("[red]Please enter a valid path[/]"));
-
-                if (string.IsNullOrWhiteSpace(aoPath))
-                {
-                    aoPath = defaultPath;
-                }
-
-                if (Directory.Exists(aoPath))
-                {
-                    string rdbPath = Path.Combine(aoPath, "cd_image", "data", "db", "ResourceDatabase.dat");
-
-                    if (File.Exists(rdbPath))
-                    {
-                        AnsiConsole.MarkupLine($"[green]Found installation at: {aoPath}[/]");
-                        AnsiConsole.MarkupLine($"[green]Found ResourceDatabase.dat[/]");
-
-                        config.AoPath = aoPath;
-                        SaveConfig(configPath, config);
-
-                        break;
-                    }
-                    else
-                    {
-                        AnsiConsole.MarkupLine($"[red]Directory exists but ResourceDatabase.dat not found at:[/]");
-                        AnsiConsole.MarkupLine($"[red]{rdbPath}[/]");
-                    }
-                }
-                else
-                {
-                    AnsiConsole.MarkupLine("[red]Directory not found. Please try again.[/]");
-                }
-            }
-
-            var rdbController = new RdbController(aoPath);
-            string exportDir = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.Desktop), "AOExport");
-            Directory.CreateDirectory(exportDir);
-
-            while (true)
-            {
-                AnsiConsole.WriteLine();
-                AnsiConsole.WriteLine();
-
-                var exportType = AnsiConsole.Prompt(
-                    new SelectionPrompt<string>()
-                        .Title("[yellow]Select option (ESC to exit):[/]")
-                        .HighlightStyle(new Style(foreground: Color.Black, background: Color.Yellow))
-                        .AddChoices("CIR Export", "ABIFF Export", "Dump CIR / ABIFF IDs", "<<< Exit >>>"));
-
-                if (exportType == "<<< Exit >>>")
-                    break;
-
-                if (exportType == "Dump CIR / ABIFF IDs")
-                {
-                    try
-                    {
-                        AnsiConsole.Status()
-                            .Start("Dumping names...", ctx =>
-                            {
-                                ctx.Spinner(Spinner.Known.Dots);
-                                ctx.SpinnerStyle(Style.Parse("yellow"));
-
-                                var names = rdbController.GetNames();
-
-                                File.WriteAllText(Path.Combine(exportDir, "CirNames.json"), JsonSerializer.Serialize(names[AODB.Common.RDBObjects.ResourceTypeId.CatMesh], new JsonSerializerOptions
-                                {
-                                    WriteIndented = true
-                                }));
-
-                                File.WriteAllText(Path.Combine(exportDir, "AbiffNames.json"), JsonSerializer.Serialize(names[AODB.Common.RDBObjects.ResourceTypeId.RdbMesh], new JsonSerializerOptions
-                                {
-                                    WriteIndented = true
-                                }));
-                            });
-
-                        AnsiConsole.MarkupLine($"[green]Names dumped successfully to {Path.Combine(exportDir, "CirNames.json")}[/]");
-                        AnsiConsole.MarkupLine($"[green]Names dumped successfully to {Path.Combine(exportDir, "AbiffNames.json")}[/]");
-                    }
-                    catch (Exception ex)
-                    {
-                        AnsiConsole.MarkupLine($"[red]Dump failed: {ex.Message}[/]");
-                    }
-
-                    AnsiConsole.WriteLine();
-                    continue;
-                }
-
-                if (exportType == "CIR Export" || exportType == "ABIFF Export")
-                {
-                    try
-                    {
-                        var names = rdbController.GetNames();
-                        var resourceType = exportType == "CIR Export"
-                            ? AODB.Common.RDBObjects.ResourceTypeId.CatMesh
-                            : AODB.Common.RDBObjects.ResourceTypeId.RdbMesh;
-
-                        var modelDict = names[resourceType];
-
-                        BrowseAndExportModels(modelDict, rdbController, exportDir, exportType.StartsWith("CIR"));
-                    }
-                    catch (Exception ex)
-                    {
-                        AnsiConsole.MarkupLine($"[red]Browse failed: {ex.Message}[/]");
-                    }
-
-                    continue;
-                }
-
-                AnsiConsole.WriteLine();
-            }
-
-            AnsiConsole.MarkupLine("[yellow]Exiting...[/]");
-        }
-
-        private static void BrowseAndExportModels(Dictionary<int, string> models, RdbController rdbController, string exportDir, bool isCir)
-        {
-            while (true)
-            {
-                AnsiConsole.MarkupLine("[dim]Type to search, ENTER to select, ESC to return to main menu[/]");
-
-                var searchResult = LiveSearchAndSelect(models);
-
-                if (searchResult == null)
-                    break;
-
-                var modelId = searchResult.Value;
-
-                try
-                {
-                    bool success = false;
-
-                    AnsiConsole.Status()
-                        .Start($"Exporting model {modelId}...", ctx =>
-                        {
-                            ctx.Spinner(Spinner.Known.Dots);
-                            ctx.SpinnerStyle(Style.Parse("yellow"));
-
-                            if (isCir)
-                            {
-                                var exporter = new CirExporter(rdbController);
-                                success = exporter.ExportGlb(exportDir, modelId);
-                            }
-                            else
-                            {
-                                var exporter = new AbiffExporter(rdbController);
-                                success = exporter.ExportGlb(exportDir, modelId);
-                            }
-                        });
-
-                    AnsiConsole.MarkupLine(success ? $"[green]Model exported successfully to {exportDir}[/]" : $"[red]Resource with id {modelId} not found in database / parser error[/]");
-                }
-                catch (Exception ex)
-                {
-                    AnsiConsole.MarkupLine($"[red]Export failed: {ex.Message}[/]");
-                }
-            }
-        }
-
-        private static int? LiveSearchAndSelect(Dictionary<int, string> models)
-        {
-            string searchTerm = "";
-            int selectedIndex = 0;
-            int scrollOffset = 0;
-            int startLine = Console.CursorTop;
-            const int maxDisplay = 22;
-            int previousDisplayCount = 0;
-
-            while (true)
-            {
-                var filteredModels = string.IsNullOrWhiteSpace(searchTerm)
-                    ? models.ToList()
-                    : models.Where(kvp =>
-                        kvp.Value.Contains(searchTerm, StringComparison.OrdinalIgnoreCase) ||
-                        kvp.Key.ToString().Contains(searchTerm))
-                      .ToList();
-
-                if (selectedIndex >= filteredModels.Count)
-                    selectedIndex = Math.Max(0, filteredModels.Count - 1);
-
-                if (selectedIndex < scrollOffset)
-                {
-                    scrollOffset = selectedIndex;
-                }
-                else if (selectedIndex >= scrollOffset + maxDisplay)
-                {
-                    scrollOffset = selectedIndex - maxDisplay + 1;
-                }
-
-                Console.SetCursorPosition(0, startLine);
-                int linesToClear = Math.Max(maxDisplay + 5, previousDisplayCount + 5);
-                for (int i = 0; i < linesToClear; i++)
-                {
-                    Console.Write(new string(' ', Console.WindowWidth));
-                    Console.WriteLine();
-                }
-                Console.SetCursorPosition(0, startLine);
-
-                AnsiConsole.MarkupLine($"[yellow]Search:[/] {searchTerm}_");
-                AnsiConsole.WriteLine();
-
-                AnsiConsole.MarkupLine($"[green]Found {filteredModels.Count} model(s)[/]");
-
-                int displayCount = Math.Min(maxDisplay, filteredModels.Count - scrollOffset);
-
-                int totalLinesDisplayed = 3;
-
-                for (int i = 0; i < displayCount; i++)
-                {
-                    int modelIndex = scrollOffset + i;
-                    var model = filteredModels[modelIndex];
-                    if (modelIndex == selectedIndex)
-                    {
-                        AnsiConsole.MarkupLine($"[black on yellow]> {model.Key} - {model.Value.EscapeMarkup()}[/]");
-                    }
-                    else
-                    {
-                        AnsiConsole.MarkupLine($"  {model.Key} - {model.Value.EscapeMarkup()}");
-                    }
-                    totalLinesDisplayed++;
-                }
-
-                if (scrollOffset > 0 || filteredModels.Count > scrollOffset + maxDisplay)
-                {
-                    AnsiConsole.WriteLine();
-                    totalLinesDisplayed++;
-
-                    string scrollInfo = "";
-                    if (scrollOffset > 0)
-                        scrollInfo += "[dim]↑ More above[/] ";
-                    if (filteredModels.Count > scrollOffset + maxDisplay)
-                        scrollInfo += $"[dim]↓ More below ({filteredModels.Count - scrollOffset - maxDisplay} more)[/]";
-
-                    if (!string.IsNullOrEmpty(scrollInfo))
-                    {
-                        AnsiConsole.MarkupLine(scrollInfo);
-                        totalLinesDisplayed++;
-                    }
-                }
-
-                previousDisplayCount = totalLinesDisplayed;
-
-                var key = Console.ReadKey(intercept: true);
-
-                if (key.Key == ConsoleKey.Escape)
-                {
-                    Console.SetCursorPosition(0, startLine);
-                    for (int i = 0; i < linesToClear; i++)
-                    {
-                        Console.Write(new string(' ', Console.WindowWidth));
-                        Console.WriteLine();
-                    }
-                    Console.SetCursorPosition(0, startLine);
-                    return null;
-                }
-                else if (key.Key == ConsoleKey.Enter && filteredModels.Count > 0)
-                {
-                    Console.SetCursorPosition(0, startLine);
-                    for (int i = 0; i < linesToClear; i++)
-                    {
-                        Console.Write(new string(' ', Console.WindowWidth));
-                        Console.WriteLine();
-                    }
-                    Console.SetCursorPosition(0, startLine);
-                    return filteredModels[selectedIndex].Key;
-                }
-                else if (key.Key == ConsoleKey.UpArrow)
-                {
-                    selectedIndex = Math.Max(0, selectedIndex - 1);
-                }
-                else if (key.Key == ConsoleKey.DownArrow)
-                {
-                    selectedIndex = Math.Min(filteredModels.Count - 1, selectedIndex + 1);
-                }
-                else if (key.Key == ConsoleKey.PageUp)
-                {
-                    selectedIndex = Math.Max(0, selectedIndex - maxDisplay);
-                }
-                else if (key.Key == ConsoleKey.PageDown)
-                {
-                    selectedIndex = Math.Min(filteredModels.Count - 1, selectedIndex + maxDisplay);
-                }
-                else if (key.Key == ConsoleKey.Home)
-                {
-                    selectedIndex = 0;
-                }
-                else if (key.Key == ConsoleKey.End)
-                {
-                    selectedIndex = filteredModels.Count - 1;
-                }
-                else if (key.Key == ConsoleKey.Backspace && searchTerm.Length > 0)
-                {
-                    searchTerm = searchTerm.Substring(0, searchTerm.Length - 1);
-                    selectedIndex = 0;
-                    scrollOffset = 0;
-                }
-                else if (!char.IsControl(key.KeyChar))
-                {
-                    searchTerm += key.KeyChar;
-                    selectedIndex = 0;
-                    scrollOffset = 0;
-                }
-            }
-        }
-
-        private static Config LoadConfig(string configPath)
-        {
-            try
-            {
-                if (File.Exists(configPath))
-                {
-                    string json = File.ReadAllText(configPath);
-                    return JsonSerializer.Deserialize<Config>(json) ?? new Config();
-                }
-            }
-            catch (Exception ex)
-            {
-                AnsiConsole.MarkupLine($"[dim red]Could not load config: {ex.Message}[/]");
-            }
-
-            return new Config();
-        }
-
-        private static void SaveConfig(string configPath, Config config)
-        {
-            try
-            {
-                string json = JsonSerializer.Serialize(config, new JsonSerializerOptions
+            File.WriteAllText(Path.Combine(exportDir, "CirNames.json"),
+                JsonSerializer.Serialize(names[AODB.Common.RDBObjects.ResourceTypeId.CatMesh],
+                new JsonSerializerOptions
                 {
                     WriteIndented = true
-                });
-                File.WriteAllText(configPath, json);
-            }
-            catch (Exception ex)
-            {
-                AnsiConsole.MarkupLine($"[dim red]Could not save config: {ex.Message}[/]");
-            }
+                }));
+
+            File.WriteAllText(Path.Combine(exportDir, "AbiffNames.json"),
+                JsonSerializer.Serialize(names[AODB.Common.RDBObjects.ResourceTypeId.RdbMesh],
+                new JsonSerializerOptions
+                {
+                    WriteIndented = true
+                }));
+
+            Console.ForegroundColor = ConsoleColor.Green;
+            Console.WriteLine($"Names dumped successfully to {Path.Combine(exportDir, "CirNames.json")}");
+            Console.WriteLine($"Names dumped successfully to {Path.Combine(exportDir, "AbiffNames.json")}");
+            Console.ResetColor();
+        }
+        catch (Exception ex)
+        {
+            Console.ForegroundColor = ConsoleColor.Red;
+            Console.WriteLine($"Dump failed: {ex.Message}");
+            Console.ResetColor();
+        }
+
+        Console.WriteLine();
+    }
+
+    private static void HandleBrowser(RdbController rdbController, string exportDir, bool isCir)
+    {
+        try
+        {
+            var names = rdbController.GetNames();
+            var resourceType = isCir
+                ? AODB.Common.RDBObjects.ResourceTypeId.CatMesh
+                : AODB.Common.RDBObjects.ResourceTypeId.RdbMesh;
+
+            var modelDict = names[resourceType];
+            ConsoleSelectionMenu
+                .Create<KeyValuePair<int, string>>()
+                .WithItems(modelDict)
+                .WithTitle(isCir ? "Cir Browser" : "Abiff Browser")
+                .WithDynamicHeight()
+                .WithDisplayFunc(kvp => $"{kvp.Key} - {kvp.Value}")
+                .WithFilterFunc((search, kvp) =>
+                    kvp.Value.Contains(search, StringComparison.OrdinalIgnoreCase) ||
+                    kvp.Key.ToString().Contains(search))
+                .EnableSearch()
+                .WithLoop()
+                .OnSelect(searchResult =>
+                {
+                    var modelId = searchResult.Key;
+                    Console.Clear();
+
+                    try
+                    {
+                        bool success = false;
+                        string objectName = string.Empty;
+                        Console.ResetColor();
+
+                        ConsoleBorder
+                            .Create(80)
+                            .GetCenter(out int startLeft, out int startTop)
+                            .WithTopBorderText(_title, ConsoleColor.Yellow)
+                            .WithBorderColor(ConsoleColor.DarkGray)
+                            .AddLine("")
+                            .AddEmptyLine()
+                            .AddEmptyLine()
+                            .Draw(centered: true);
+
+                        using (var spinner = ConsoleSpinner.Start($"Exporting model {modelId}...", startLeft + 2, startTop, ConsoleColor.Yellow))
+                        {
+                            success = isCir ?
+                                new CirExporter(rdbController).ExportGlb(exportDir, modelId, out objectName) :
+                                new AbiffExporter(rdbController).ExportGlb(exportDir, modelId, out objectName);
+                        }
+
+                        Console.Clear();
+
+                        ConsoleBorder
+                             .Create(80)
+                             .WithTopBorderText(_title, ConsoleColor.Yellow)
+                             .WithBorderColor(ConsoleColor.DarkGray)
+                             .AddEmptyLine()
+                             .AddLine(success ? $"Saved at: {exportDir}\\{objectName}.glb" : $"Resource with id {modelId} not found in database / parser error", success ? ConsoleColor.Green : ConsoleColor.Red)
+                             .AddEmptyLine()
+                             .Draw(centered: true);
+                        Console.ResetColor();
+                        Console.ReadKey();
+                    }
+                    catch (Exception ex)
+                    {
+                        Console.ForegroundColor = ConsoleColor.Red;
+                        Console.WriteLine($"Export failed: {ex.Message}");
+                        Console.ResetColor();
+                    }
+
+                    return true;
+                })
+                .Show();
+        }
+        catch (Exception ex)
+        {
+            Console.ForegroundColor = ConsoleColor.Red;
+            Console.WriteLine($"Browse failed: {ex.Message}");
+            Console.ResetColor();
         }
     }
 }

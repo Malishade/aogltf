@@ -49,8 +49,9 @@ namespace aogltf
             GltfFileWriter.WriteToFile(Path.Combine(outputFolder, $"{objectName}.gltf"), gltf);
         }
 
-        public bool ExportGlb(string outputFolder, int meshId)
+        public bool ExportGlb(string outputFolder, int meshId, out string objectName)
         {
+            objectName = string.Empty;
             RDBMesh_t? rdbMesh;
 
             try
@@ -67,7 +68,7 @@ namespace aogltf
 
             var sceneBuilder = new AbiffSceneBuilder(rdbMesh);
             var meshProcessor = new AbiffMeshProcessor(rdbMesh);
-            var objectName = GetInfoObjectName(_rdbController, meshId);
+            objectName = GetInfoObjectName(_rdbController, meshId);
 
             SceneData sceneData = sceneBuilder.BuildSceneHierarchy();
             meshProcessor.ProcessMeshData(sceneData);

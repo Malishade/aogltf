@@ -1,1 +1,1 @@
-Might need rereferencing AODB project (https://gitlab.com/never-knows-best/aodb) in the dependencies. This project will eventually be merged with AODB.
+Console app for exporting Anarchy Online .abiff and .cir models into .gltf / .glb. This project will eventually be merged with AODB.

@@ -52,8 +52,9 @@ namespace aogltf
             GltfFileWriter.WriteToFile(Path.Combine(outputFolder, $"{objectName}.gltf"), gltf);
         }
 
-        public bool ExportGlb(string outputFolder, int meshId)
+        public bool ExportGlb(string outputFolder, int meshId, out string objectName)
         {
+            objectName = string.Empty;
             RDBCatMesh? catMesh;
 
             try
@@ -73,7 +74,7 @@ namespace aogltf
 
             var sceneBuilder = new CirSceneBuilder(catMesh, animData);
             var meshProcessor = new CirMeshProcessor(catMesh);
-            var objectName = GetCatMeshName(_rdbController, meshId);
+              objectName = GetCatMeshName(_rdbController, meshId);
 
             SceneData sceneData = sceneBuilder.BuildSceneHierarchy(out var boneData);
             meshProcessor.ProcessMeshData(sceneData, boneData);
