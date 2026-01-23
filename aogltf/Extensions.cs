@@ -1,4 +1,6 @@
-﻿using System.Numerics;
+﻿using AODB;
+using AODB.Common.RDBObjects;
+using System.Numerics;
 
 namespace aogltf
 {
@@ -29,6 +31,28 @@ namespace aogltf
                 point.X * matrix.M12 + point.Y * matrix.M22 + point.Z * matrix.M32 + matrix.M42,
                 point.X * matrix.M13 + point.Y * matrix.M23 + point.Z * matrix.M33 + matrix.M43
             );
+        }
+
+        internal static Dictionary<ResourceTypeId, Dictionary<int, string>> GetNames(this RdbController controller)
+        {
+            var names = new Dictionary<ResourceTypeId, Dictionary<int, string>>();
+            var types = controller.Get<InfoObject>(1).Types;
+
+            foreach (var resource in new ResourceTypeId[] { ResourceTypeId.CatMesh, ResourceTypeId.RdbMesh })
+            {
+                foreach (var rdbMeshKey in controller.RecordTypeToId[(int)resource].Keys)
+                {
+                    if (!types[resource].TryGetValue(rdbMeshKey, out string name))
+                        name = $"UnnamedRecord_{rdbMeshKey}";
+
+                    if (!names.ContainsKey(resource))
+                        names.Add(resource, new Dictionary<int, string>());
+
+                    names[resource].Add(rdbMeshKey, name);
+                }
+            }
+
+            return names;
         }
     }
 }

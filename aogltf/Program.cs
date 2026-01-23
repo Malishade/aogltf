@@ -81,10 +81,45 @@ namespace aogltf
                     new SelectionPrompt<string>()
                         .Title("[yellow]Select resource database object type:[/]")
                         .HighlightStyle(new Style(foreground: Color.Black, background: Color.Yellow))
-                        .AddChoices("CIR", "ABIFF", "Exit"));
+                        .AddChoices("CIR", "ABIFF", "Dump Names", "Exit"));
 
                 if (exportType == "Exit")
                     break;
+
+                if (exportType == "Dump Names")
+                {
+                    try
+                    {
+                        AnsiConsole.Status()
+                            .Start("Dumping names...", ctx =>
+                            {
+                                ctx.Spinner(Spinner.Known.Dots);
+                                ctx.SpinnerStyle(Style.Parse("yellow"));
+
+                                var names = rdbController.GetNames();
+
+                                File.WriteAllText(Path.Combine(exportDir, "CirNames.json"), JsonSerializer.Serialize(names[AODB.Common.RDBObjects.ResourceTypeId.CatMesh], new JsonSerializerOptions
+                                {
+                                    WriteIndented = true
+                                }));
+
+                                File.WriteAllText(Path.Combine(exportDir, "AbiffNames.json"), JsonSerializer.Serialize(names[AODB.Common.RDBObjects.ResourceTypeId.RdbMesh], new JsonSerializerOptions
+                                {
+                                    WriteIndented = true
+                                }));
+                            });
+
+                        AnsiConsole.MarkupLine($"[green]Names dumped successfully to {Path.Combine(exportDir, "CirNames.json")}[/]");
+                        AnsiConsole.MarkupLine($"[green]Names dumped successfully to {Path.Combine(exportDir, "AbiffNames.json")}[/]");
+                    }
+                    catch (Exception ex)
+                    {
+                        AnsiConsole.MarkupLine($"[red]Dump failed: {ex.Message}[/]");
+                    }
+
+                    AnsiConsole.WriteLine();
+                    continue;
+                }
 
                 var modelId = AnsiConsole.Prompt(
                     new TextPrompt<int>("[yellow]Enter model ID:[/]")
