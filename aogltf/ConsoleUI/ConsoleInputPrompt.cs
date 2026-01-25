@@ -1,6 +1,4 @@
-﻿using static ConsoleUI.ConsoleSelectionMenu;
-
-namespace ConsoleUI;
+﻿namespace ConsoleUI;
 
 internal static class ConsoleInputPrompt
 {
@@ -18,7 +16,8 @@ internal static class ConsoleInputPrompt
         private Action<string>? _onInput = null;
         private int _borderWidth = 80;
         private string _title = "";
-
+        private ConsoleColor _foregroundPrompt = ConsoleColor.White;
+        private ConsoleColor _foregroundInput = ConsoleColor.Yellow;
         public InputPrompt WithPrompt(string prompt)
         {
             _prompt = prompt;
@@ -65,43 +64,29 @@ internal static class ConsoleInputPrompt
         {
             Console.Clear();
 
-            var border = ConsoleBorder
-                .Create(_borderWidth)
-                .WithTopBorderText(_title, ConsoleColor.White)
-                .WithBorderColor(ConsoleColor.DarkGray)
-                .AddEmptyLine()
-                .GetCenter(out int startLeft, out int startTop)
-                .AddLine(_prompt, ConsoleColor.Yellow)
-                .AddLine(_defaultValue, ConsoleColor.Green)
-                .AddEmptyLine()
+            ConsoleBorder.Create(_borderWidth)
+                .WithTitle(_title, ConsoleColor.White)
+                .AddCell(1, out var promptCell, 1)
+                .AddCell(1, out var inputCell, 1)
                 .Draw(centered: true);
 
-            startTop += 2;
-            startLeft += 2;
+            promptCell.WriteLine(_prompt, foreground: _foregroundPrompt);
+            inputCell.WriteLine(_defaultValue, foreground: ConsoleColor.Green);
+            
+            string input = "";
 
             while (true)
             {
-                Console.SetCursorPosition(startLeft, startTop);
-
-                string input = ReadInputWithCursor();
-
-                if (string.IsNullOrWhiteSpace(input))
+                input = ReadInputWithCursor(input, inputCell);
+                input = string.IsNullOrEmpty(input) ? _defaultValue : input;
+                var inputIsEmpty = string.IsNullOrEmpty(input);
+                
+                if (!_allowEmpty && inputIsEmpty)
                 {
-                    if (!string.IsNullOrWhiteSpace(_defaultValue))
-                    {
-                        input = _defaultValue;
-                    }
-                    else if (!_allowEmpty)
-                    {
-                        Console.SetCursorPosition(startLeft, startTop);
-                        Console.ForegroundColor = ConsoleColor.Red;
-                        Console.Write("Input cannot be empty. Please try again.".PadRight(_borderWidth - 4));
-                        Console.ResetColor();
-                        Thread.Sleep(2000);
-                        Console.SetCursorPosition(startLeft, startTop);
-                        Console.Write("".PadRight(_borderWidth - 4));
-                        continue;
-                    }
+                    inputCell.WriteLine("Input cannot be empty.", foreground: ConsoleColor.Red);
+                    Thread.Sleep(2000);
+                    inputCell.Clear(0);
+                    continue;
                 }
 
                 if (_validator != null)
@@ -110,101 +95,110 @@ internal static class ConsoleInputPrompt
 
                     if (!isValid)
                     {
-                        Console.SetCursorPosition(startLeft, startTop);
-                        Console.ForegroundColor = ConsoleColor.Red;
-                        Console.Write((message ?? "Invalid input. Please try again.").PadRight(_borderWidth - 4));
-                        Console.ResetColor();
+                        inputCell.WriteLine(message, foreground: ConsoleColor.Red);
                         Thread.Sleep(2000);
-                        Console.SetCursorPosition(startLeft, startTop);
-                        Console.ForegroundColor = ConsoleColor.Green;
-                        Console.Write(!string.IsNullOrEmpty(_defaultValue) ? _defaultValue.PadRight(_borderWidth - 4) : string.Empty.PadRight(_borderWidth - 4));
-                        Console.ResetColor();
+                        inputCell.WriteLine(input + "_", foreground: _foregroundInput);
                         continue;
                     }
                     else if (!string.IsNullOrWhiteSpace(message))
                     {
-                        Console.SetCursorPosition(startLeft, startTop);
-                        Console.ForegroundColor = ConsoleColor.Green;
-                        Console.Write(message.PadRight(_borderWidth - 4));
-                        Console.ResetColor();
+                        inputCell.WriteLine(message, foreground: ConsoleColor.Green);
                         Thread.Sleep(150);
                     }
                 }
 
-                _onInput?.Invoke(input);
+                _onInput?.Invoke(inputIsEmpty ? input : _defaultValue);
                 break;
             }
         }
-        private string ReadInputWithCursor()
+
+        private string ReadInputWithCursor(string input, ConsoleBorder.Cell inputCell)
         {
-            string input = "";
             bool firstKeyPress = true;
-            int startX = Console.CursorLeft;
-            int startY = Console.CursorTop;
+            var cursorTimer = new System.Timers.Timer(500);
+            bool showCursor = true;
+
+            cursorTimer.Elapsed += (s, e) =>
+            {
+                showCursor = !showCursor;
+                RedrawInput(input, inputCell, showCursor, firstKeyPress);
+            };
+            cursorTimer.Start();
 
             if (string.IsNullOrWhiteSpace(_defaultValue))
             {
-                Console.SetCursorPosition(startX, startY);
-                Console.Write("_");
-                Console.SetCursorPosition(startX, startY);
+                inputCell.WriteLine("_", foreground: _foregroundInput);
             }
 
             while (true)
             {
                 var key = Console.ReadKey(intercept: true);
+                showCursor = true;
 
                 if (key.Key == ConsoleKey.Enter)
                 {
+                    cursorTimer.Stop();
                     break;
                 }
                 else if (key.Key == ConsoleKey.Backspace)
                 {
-                    if (input.Length > 0)
+                    if (key.Modifiers.HasFlag(ConsoleModifiers.Control))
+                    {
+                        input = DeleteLastWord(input);
+                    }
+                    else if (input.Length > 0)
                     {
                         input = input.Substring(0, input.Length - 1);
                     }
 
                     if (input.Length == 0 && !string.IsNullOrWhiteSpace(_defaultValue))
                     {
-                        Console.SetCursorPosition(startX, startY);
-                        Console.ForegroundColor = ConsoleColor.Green;
-                        Console.Write(_defaultValue.PadRight(_borderWidth - 4));
-                        Console.ResetColor();
+                        inputCell.WriteLine(_defaultValue, foreground: ConsoleColor.Green);
                         firstKeyPress = true;
-
                     }
                     else
                     {
-
-                        Console.SetCursorPosition(startX, startY);
-                        string display = input + "_";
-                        Console.Write(display.PadRight(_borderWidth - 4));
-                        Console.SetCursorPosition(startX + input.Length, startY);
+                        inputCell.WriteLine(input + "_", foreground: _foregroundInput);
                     }
                 }
                 else if (!char.IsControl(key.KeyChar))
                 {
-
                     if (firstKeyPress)
                     {
-                        Console.SetCursorPosition(startX, startY);
-                        Console.Write("".PadRight(_borderWidth - 4));
                         firstKeyPress = false;
                     }
 
                     input += key.KeyChar;
-
-                    Console.SetCursorPosition(startX, startY);
-                    string display = input + "_";
-                    Console.Write(display.PadRight(_borderWidth - 4));
-                    Console.SetCursorPosition(startX + input.Length, startY);
+                    inputCell.WriteLine(input + "_", foreground: _foregroundInput);
                 }
             }
 
-            Console.SetCursorPosition(startX, startY);
-            Console.Write(input.PadRight(_borderWidth - 4));
-
+            inputCell.WriteLine(input, foreground: _foregroundInput);
             return input;
+        }
+        private string DeleteLastWord(string input)
+        {
+            if (string.IsNullOrEmpty(input))
+                return input;
+
+            input = input.TrimEnd();
+            int lastSpace = input.LastIndexOf(' ');
+
+            if (lastSpace >= 0)
+            {
+                return input.Substring(0, lastSpace);
+            }
+
+            return "";
+        }
+        private void RedrawInput(string input, ConsoleBorder.Cell inputCell, bool showCursor, bool firstKeyPress)
+        {
+            if (input.Length == 0 && !string.IsNullOrWhiteSpace(_defaultValue) && firstKeyPress)
+            {
+                return;
+            }
+
+            inputCell.WriteLine(input + (showCursor ? "_" : " "), foreground: _foregroundInput);
         }
     }
 }

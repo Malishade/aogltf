@@ -17,8 +17,11 @@ internal static class ConsoleSelectionMenu
         private bool _enableSearch = false;
         private Func<T, bool>? _onSelect = null;
         private bool _loop = false;
+        private bool _showInfo = false;
         private bool _escapePressed = false;
         private int _borderWidth = 80;
+        private bool _dynamicHeight = false;
+        private ConsoleColor _foreground = ConsoleColor.Yellow;
 
         public class MenuItem<TValue>
         {
@@ -49,6 +52,12 @@ internal static class ConsoleSelectionMenu
             return this;
         }
 
+        public SelectionMenu<T> WithSearchPrompt(string prompt)
+        {
+            _searchPrompt = prompt;
+            return this;
+        }
+
         public SelectionMenu<T> WithDisplayFunc(Func<T, string> displayFunc)
         {
             _displayFunc = displayFunc;
@@ -72,6 +81,11 @@ internal static class ConsoleSelectionMenu
             _loop = loop;
             return this;
         }
+        public SelectionMenu<T> WithShowInfo(bool showInfo = true)
+        {
+            _showInfo = showInfo;
+            return this;
+        }
 
         public SelectionMenu<T> OnSelect(Func<T, bool> onSelect)
         {
@@ -84,42 +98,16 @@ internal static class ConsoleSelectionMenu
             _borderWidth = Math.Min(width, Console.WindowWidth);
             return this;
         }
-        public SelectionMenu<T> WithDynamicHeight()
+
+        public SelectionMenu<T> WithDynamicHeight(bool enable = true)
         {
-            _dynamicHeight = true;
+            _dynamicHeight = enable;
             return this;
-        }
-
-        private bool _dynamicHeight = false;
-
-        private int CalculateMaxDisplay()
-        {
-            int consoleHeight = Console.WindowHeight;
-            int reservedLines = 2;
-
-            if (_enableSearch)
-            {
-                if (!string.IsNullOrWhiteSpace(_searchPrompt))
-                    reservedLines += 2;
-                reservedLines += 6;
-            }
-            else
-            {
-                if (!string.IsNullOrWhiteSpace(_title))
-                    reservedLines += 2;
-            }
-
-            reservedLines += 2;
-
-            int availableLines = consoleHeight - reservedLines;
-
-            return Math.Max(5, availableLines);
         }
 
         public T? Show()
         {
-            var loop = _loop ? ShowLoop() : ShowOnce();
-            return loop;
+            return _loop ? ShowLoop() : ShowOnce();
         }
 
         private T? ShowLoop()
@@ -148,18 +136,67 @@ internal static class ConsoleSelectionMenu
                 }
             }
         }
-
         private T? ShowOnce()
         {
-            var maxDisplay = CalculateMaxDisplay();
             _escapePressed = false;
             _items = _items.Select(item => new MenuItem<T>(item.Value, _displayFunc(item.Value))).ToList();
+
+            var border = ConsoleBorder
+                .Create(_borderWidth)
+                .WithTitle(_title);
+
+            ConsoleBorder.Cell searchCell = null;
+            ConsoleBorder.Cell itemsCell = null;
+            ConsoleBorder.Cell scrollInfoCell = null;
+
+            if (_enableSearch)
+            {
+                border.AddCell(1, out searchCell, 1);
+            }
+
+            int itemsHeight;
+            if (_dynamicHeight)
+            {
+                int availableHeight = Console.WindowHeight - 4;
+                if (_enableSearch)
+                    availableHeight -= (searchCell?.PaddedHeight ?? 0) + 4;
+                availableHeight -= 2;
+                itemsHeight = Math.Max(5, availableHeight);
+            }
+            else
+            {
+                itemsHeight = _items.Count;
+            }
+
+            border.AddCell(itemsHeight, out itemsCell, 1);
+
+            if (_showInfo)
+            {
+                border.AddCell(1, out scrollInfoCell);
+                scrollInfoCell.PaddingX += 2;
+            }
+
+            border.Draw(centered: true);
 
             string searchTerm = "";
             int selectedIndex = 0;
             int scrollOffset = 0;
-            int startLine = Console.CursorTop;
+            int previousSelectedIndex = -1;
+            int previousScrollOffset = -1;
+            string previousSearchTerm = "";
             int previousDisplayCount = 0;
+
+            int maxItemsDisplay = itemsCell.Height - itemsCell.PaddingY * 2;
+
+            if (_enableSearch)
+            {
+                int line = 0;
+                if (!string.IsNullOrWhiteSpace(_searchPrompt))
+                {
+                    searchCell.WriteLine(_searchPrompt, line++, ConsoleColor.Gray);
+                }
+                searchCell.WriteLine($"Search: {searchTerm}_", line, foreground: _foreground);
+            }
 
             while (true)
             {
@@ -170,118 +207,88 @@ internal static class ConsoleSelectionMenu
                     displayItems = _items.Where(item => _filterFunc(searchTerm, item.Value)).ToList();
                 }
 
-                if (selectedIndex >= displayItems.Count)
-                    selectedIndex = Math.Max(0, displayItems.Count - 1);
+                if (selectedIndex >= displayItems.Count && displayItems.Count > 0)
+                {
+                    selectedIndex = displayItems.Count - 1;
+                }
+
+                if (selectedIndex < 0 && displayItems.Count > 0)
+                {
+                    selectedIndex = 0;
+                }
 
                 if (selectedIndex < scrollOffset)
                 {
                     scrollOffset = selectedIndex;
                 }
-                else if (selectedIndex >= scrollOffset + maxDisplay)
+                else if (selectedIndex >= scrollOffset + maxItemsDisplay)
                 {
-                    scrollOffset = selectedIndex - maxDisplay + 1;
+                    scrollOffset = selectedIndex - maxItemsDisplay + 1;
                 }
 
-                Console.SetCursorPosition(0, startLine);
-                int linesToClear = Math.Max(maxDisplay + 10, previousDisplayCount + 10);
-                
-                for (int i = 0; i < linesToClear; i++)
+                if (_enableSearch && searchTerm != previousSearchTerm)
                 {
-                    Console.Write(new string(' ', Console.WindowWidth));
-                    Console.WriteLine();
-                }
-                Console.SetCursorPosition(0, startLine);
-
-                var border = ConsoleBorder
-                    .Create(_borderWidth)
-                    .WithBorderColor(ConsoleColor.DarkGray)
-                    .WithTopBorderText(_title, ConsoleColor.Yellow).AddEmptyLine();
-
-                if (_enableSearch)
-                {
-                    if (!string.IsNullOrWhiteSpace(_searchPrompt))
-                    {
-                        border.AddLine(_searchPrompt, ConsoleColor.DarkGray);
-                    }
-
-                    border.AddLine($"Search: {searchTerm}_", ConsoleColor.Yellow)
-                        .AddEmptyLine()
-                        .AddSeparator();
+                    int line = string.IsNullOrWhiteSpace(_searchPrompt) ? 0 : 1;
+                    searchCell.WriteLine($"Search: {searchTerm}_", line, foreground: _foreground);
                 }
 
-                int displayCount = Math.Min(maxDisplay, displayItems.Count - scrollOffset);
+                bool itemsChanged = displayItems.Count != previousDisplayCount || scrollOffset != previousScrollOffset;
 
-                for (int i = 0; i < displayCount; i++)
+                if (itemsChanged)
                 {
-                    int itemIndex = scrollOffset + i;
-                    var item = displayItems[itemIndex];
-                    string displayText = item.Display;
+                    int visibleCount = Math.Min(maxItemsDisplay, displayItems.Count - scrollOffset);
 
-                    if (displayText.Length > _borderWidth - 8)
+                    for (int i = 0; i < visibleCount; i++)
                     {
-                        displayText = string.Concat(displayText.AsSpan(0, _borderWidth - 11), "...");
+                        int itemIndex = scrollOffset + i;
+                        var item = displayItems[itemIndex];
+                        DrawItem(itemsCell, i, item, itemIndex == selectedIndex);
                     }
 
-                    if (itemIndex == selectedIndex)
+                    for (int i = visibleCount; i < maxItemsDisplay; i++)
                     {
-                        border.AddSelectedLine($"> {displayText}");
+                        itemsCell.Clear(i);
                     }
-                    else
+
+                    if (_showInfo)
                     {
-                        border.AddLine($"  {displayText}");
+                        UpdateScrollInfo(scrollInfoCell, displayItems.Count, scrollOffset, maxItemsDisplay);
+                    }
+                }
+                else if (selectedIndex != previousSelectedIndex)
+                {
+                    if (previousSelectedIndex >= scrollOffset && previousSelectedIndex < scrollOffset + maxItemsDisplay)
+                    {
+                        int prevLineOffset = previousSelectedIndex - scrollOffset;
+                        DrawItem(itemsCell, prevLineOffset, displayItems[previousSelectedIndex], false);
+                    }
+
+                    if (selectedIndex >= scrollOffset && selectedIndex < scrollOffset + maxItemsDisplay)
+                    {
+                        int currLineOffset = selectedIndex - scrollOffset;
+                        DrawItem(itemsCell, currLineOffset, displayItems[selectedIndex], true);
                     }
                 }
 
-                if (_dynamicHeight)
-                {
-                    for (int i = displayCount; i < maxDisplay; i++)
-                    {
-                        border.AddLine("  ");
-                    }
-                }
-
-                if (scrollOffset > 0 || displayItems.Count > scrollOffset + maxDisplay)
-                {
-                    string scrollInfo = "";
-                    string totalFound = $"Total: {displayItems.Count} ";
-
-                    if (scrollOffset > 0)
-                        scrollInfo += $"↑ More above ({scrollOffset}) ";
-                    if (displayItems.Count > scrollOffset + maxDisplay)
-                        scrollInfo += $"↓ More below ({displayItems.Count - scrollOffset - maxDisplay} more)";
-
-                    if (!string.IsNullOrEmpty(scrollInfo))
-                    {
-                        border.AddSeparator()
-                              .AddLine(scrollInfo, totalFound, ConsoleColor.DarkGray, ConsoleColor.Green);
-                    }
-                }
-                else
-                {
-                    border.AddLine("  ");
-                    border.AddLine("  ");
-                }
-
-                previousDisplayCount = border
-                    .AddEmptyLine()
-                    .Draw(centered: true);
+                previousSelectedIndex = selectedIndex;
+                previousScrollOffset = scrollOffset;
+                previousSearchTerm = searchTerm;
+                previousDisplayCount = displayItems.Count;
 
                 var key = Console.ReadKey(intercept: true);
 
                 if (key.Key == ConsoleKey.Escape)
                 {
-                    ClearDisplay(startLine, linesToClear);
                     _escapePressed = true;
                     return default;
                 }
                 else if (key.Key == ConsoleKey.Enter && displayItems.Count > 0)
                 {
-                    ClearDisplay(startLine, linesToClear);
                     return displayItems[selectedIndex].Value;
                 }
                 else if (key.Key == ConsoleKey.UpArrow)
                 {
-                    selectedIndex = selectedIndex == 0 ? displayItems.Count - 1 : selectedIndex - 1;
+                    selectedIndex = selectedIndex <= 0 ? displayItems.Count - 1 : selectedIndex - 1;
                 }
                 else if (key.Key == ConsoleKey.DownArrow)
                 {
@@ -289,11 +296,11 @@ internal static class ConsoleSelectionMenu
                 }
                 else if (key.Key == ConsoleKey.PageUp)
                 {
-                    selectedIndex = Math.Max(0, selectedIndex - maxDisplay);
+                    selectedIndex = Math.Max(0, selectedIndex - maxItemsDisplay);
                 }
                 else if (key.Key == ConsoleKey.PageDown)
                 {
-                    selectedIndex = Math.Min(displayItems.Count - 1, selectedIndex + maxDisplay);
+                    selectedIndex = Math.Min(displayItems.Count - 1, selectedIndex + maxItemsDisplay);
                 }
                 else if (key.Key == ConsoleKey.Home)
                 {
@@ -301,7 +308,7 @@ internal static class ConsoleSelectionMenu
                 }
                 else if (key.Key == ConsoleKey.End)
                 {
-                    selectedIndex = displayItems.Count - 1;
+                    selectedIndex = Math.Max(0, displayItems.Count - 1);
                 }
                 else if (_enableSearch && key.Key == ConsoleKey.Backspace && searchTerm.Length > 0)
                 {
@@ -318,15 +325,37 @@ internal static class ConsoleSelectionMenu
             }
         }
 
-        private void ClearDisplay(int startLine, int linesToClear)
+        private void DrawItem(ConsoleBorder.Cell cell, int lineOffset, MenuItem<T> item, bool isSelected)
         {
-            Console.SetCursorPosition(0, startLine);
-            for (int i = 0; i < linesToClear; i++)
+            string displayText = item.Display;
+            int maxWidth = cell.PaddedWidth - 2;
+
+            if (displayText.Length > maxWidth)
             {
-                Console.Write(new string(' ', Console.WindowWidth));
-                Console.WriteLine();
+                displayText = string.Concat(displayText.AsSpan(0, maxWidth - 3), "...");
             }
-            Console.SetCursorPosition(0, startLine);
+
+            string prefix = isSelected ? "> " : "  ";
+            string content = prefix + displayText;
+
+            cell.WriteLine(
+                content,
+                lineOffset,
+                isSelected ? ConsoleColor.Black : ConsoleColor.Gray,
+                isSelected ? _foreground : cell.BackgroundColor
+            );
+        }
+
+        private void UpdateScrollInfo(ConsoleBorder.Cell cell, int totalCount, int scrollOffset, int maxDisplay)
+        {
+            string scrollInfo = "";
+            if (scrollOffset > 0)
+                scrollInfo += $"↑ {scrollOffset} above ";
+            if (totalCount > scrollOffset + maxDisplay)
+                scrollInfo += $"↓ {totalCount - scrollOffset - maxDisplay} below";
+
+            string totalInfo = $"Total: {totalCount}";
+            cell.WriteLine(scrollInfo, totalInfo, leftForeground: ConsoleColor.DarkCyan, rightForeground: ConsoleColor.DarkCyan);
         }
     }
 }

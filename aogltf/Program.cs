@@ -60,8 +60,6 @@ internal class Program
         string exportDir = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.Desktop), "AOExport");
         Directory.CreateDirectory(exportDir);
 
-        Console.WriteLine();
-        Console.WriteLine();
         ConsoleSelectionMenu
             .Create<ExportOption>()
             .WithBorderWidth(35)
@@ -154,8 +152,9 @@ internal class Program
             ConsoleSelectionMenu
                 .Create<KeyValuePair<int, string>>()
                 .WithItems(modelDict)
-                .WithTitle(isCir ? "Cir Browser" : "Abiff Browser")
                 .WithDynamicHeight()
+                .WithShowInfo()
+                .WithTitle(isCir ? "Cir Browser" : "Abiff Browser")
                 .WithDisplayFunc(kvp => $"{kvp.Key} - {kvp.Value}")
                 .WithFilterFunc((search, kvp) =>
                     kvp.Value.Contains(search, StringComparison.OrdinalIgnoreCase) ||
@@ -173,34 +172,25 @@ internal class Program
                         string objectName = string.Empty;
                         Console.ResetColor();
 
-                        ConsoleBorder
+                        var border = ConsoleBorder
                             .Create(80)
-                            .GetCenter(out int startLeft, out int startTop)
-                            .WithTopBorderText(_title, ConsoleColor.Yellow)
-                            .WithBorderColor(ConsoleColor.DarkGray)
-                            .AddLine("")
-                            .AddEmptyLine()
-                            .AddEmptyLine()
-                            .Draw(centered: true);
+                            .AddCell(1, out var cell, 1)
+                            .WithTitle(_title);
 
-                        using (var spinner = ConsoleSpinner.Start($"Exporting model {modelId}...", startLeft + 2, startTop, ConsoleColor.Yellow))
+                        border.Draw(centered: true);
+
+                        using (var spinner = new ConsoleSpinner($"Exporting model {modelId}...", SpinnerStyle.Line))
                         {
+                            spinner.Start(text => cell.WriteLine(text, 0, foreground: ConsoleColor.Yellow));
+
                             success = isCir ?
                                 new CirExporter(rdbController).ExportGlb(exportDir, modelId, out objectName) :
                                 new AbiffExporter(rdbController).ExportGlb(exportDir, modelId, out objectName);
+
+                            spinner.Stop();
                         }
 
-                        Console.Clear();
-
-                        ConsoleBorder
-                             .Create(80)
-                             .WithTopBorderText(_title, ConsoleColor.Yellow)
-                             .WithBorderColor(ConsoleColor.DarkGray)
-                             .AddEmptyLine()
-                             .AddLine(success ? $"Saved at: {exportDir}\\{objectName}.glb" : $"Resource with id {modelId} not found in database / parser error", success ? ConsoleColor.Green : ConsoleColor.Red)
-                             .AddEmptyLine()
-                             .Draw(centered: true);
-                        Console.ResetColor();
+                        cell.WriteLine(success ? $"Saved at: {exportDir}\\{objectName}.glb" : $"Resource with id {modelId} not found in database / parser error", foreground: success ? ConsoleColor.Green : ConsoleColor.Red);
                         Console.ReadKey();
                     }
                     catch (Exception ex)

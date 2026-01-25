@@ -1,86 +1,66 @@
-﻿namespace ConsoleUI;
-
-public class ConsoleSpinner : IDisposable
+﻿public class ConsoleSpinner : IDisposable
 {
-    private readonly string[] _frames = { "|", "/", "-", "\\" };
-    private readonly int _left;
-    private readonly int _top;
+    private readonly System.Timers.Timer _timer;
+    private readonly char[] _frames;
     private readonly string _message;
-    private readonly CancellationTokenSource _cancellationTokenSource;
-    private readonly Task _spinnerTask;
-    private bool _disposed = false;
+    private int _currentFrame;
+    private Action<string> _updateAction;
 
-    private ConsoleSpinner(string message, int left, int top)
+    public ConsoleSpinner(string message, SpinnerStyle style = SpinnerStyle.Line, int intervalMs = 100)
     {
         _message = message;
-        _left = left;
-        _top = top;
-        _cancellationTokenSource = new CancellationTokenSource();
+        _frames = GetFrames(style);
+        _currentFrame = 0;
 
-        _spinnerTask = Task.Run(() => Spin(_cancellationTokenSource.Token));
-    }
-
-    public static ConsoleSpinner Start(string message = "Loading...", int left = 2, int top = 2, ConsoleColor color = ConsoleColor.White)
-    {
-        Console.ForegroundColor = color;
-        Console.CursorVisible = false;
-        return new ConsoleSpinner(message, left, top);
-    }
-
-    private void Spin(CancellationToken cancellationToken)
-    {
-        int frameIndex = 0;
-
-        while (!cancellationToken.IsCancellationRequested)
+        _timer = new System.Timers.Timer(intervalMs);
+        _timer.Elapsed += (s, e) =>
         {
-            try
-            {
-                Console.SetCursorPosition(_left, _top);
-                Console.Write($"{_frames[frameIndex]} {_message}");
-
-                frameIndex = (frameIndex + 1) % _frames.Length;
-
-                Thread.Sleep(80);
-            }
-            catch
-            {
-                break;
-            }
-        }
+            _currentFrame = (_currentFrame + 1) % _frames.Length;
+            _updateAction?.Invoke($"{_frames[_currentFrame]} {_message}");
+        };
     }
 
-    public void Stop(string? finalMessage = null, ConsoleColor? color = null)
+    public void Start(Action<string> updateAction)
     {
-        if (!_disposed)
+        _updateAction = updateAction;
+        _timer.Start();
+        _updateAction?.Invoke($"{_frames[0]} {_message}");
+    }
+
+    public void Stop(string finalMessage = null)
+    {
+        _timer.Stop();
+        if (finalMessage != null)
         {
-            _cancellationTokenSource.Cancel();
-            _spinnerTask.Wait();
-
-            if (finalMessage != null)
-            {
-                Console.SetCursorPosition(_left, _top);
-                var originalColor = Console.ForegroundColor;
-
-                if (color.HasValue)
-                    Console.ForegroundColor = color.Value;
-
-                Console.Write(finalMessage.PadRight(_message.Length + 10));
-
-                if (color.HasValue)
-                    Console.ForegroundColor = originalColor;
-            }
-
-            Console.ResetColor();
+            _updateAction?.Invoke(finalMessage);
         }
     }
 
     public void Dispose()
     {
-        if (!_disposed)
-        {
-            Stop();
-            _cancellationTokenSource.Dispose();
-            _disposed = true;
-        }
+        _timer?.Stop();
+        _timer?.Dispose();
     }
+
+    private char[] GetFrames(SpinnerStyle style)
+    {
+        return style switch
+        {
+            SpinnerStyle.Line => new[] { '|', '/', '-', '\\' },
+            SpinnerStyle.Dots => new[] { '⠋', '⠙', '⠹', '⠸', '⠼', '⠴', '⠦', '⠧', '⠇', '⠏' },
+            SpinnerStyle.Arrows => new[] { '←', '↖', '↑', '↗', '→', '↘', '↓', '↙' },
+            SpinnerStyle.Circle => new[] { '◐', '◓', '◑', '◒' },
+            SpinnerStyle.Bounce => new[] { '⠁', '⠂', '⠄', '⡀', '⢀', '⠠', '⠐', '⠈' },
+            _ => new[] { '|', '/', '-', '\\' }
+        };
+    }
+}
+
+public enum SpinnerStyle
+{
+    Line,
+    Dots,
+    Arrows,
+    Circle,
+    Bounce
 }

@@ -11,318 +11,259 @@ internal static class ConsoleBorder
     public const char VerticalRight = '├';
     public const char VerticalLeft = '┤';
 
-
-    public static BorderBuilder Create(int width)
+    public static BorderContainer Create(int width)
     {
-        return new BorderBuilder(width);
+        return new BorderContainer(width);
     }
 
-    public class BorderBuilder
+    public class Cell
+    {
+        public int PaddingY = 0;
+        public int PaddingX = 0;
+        public int X;
+        public int Y;
+        public int Width;
+        public int Height;
+        public int PaddedHeight => Height - PaddingY;
+        public int PaddedWidth => Width - PaddingX;
+        public ConsoleColor BackgroundColor;
+
+        public void WriteLine(string text, int lineOffset = 0, ConsoleColor foreground = ConsoleColor.Gray, ConsoleColor? background = null)
+        {
+            if (string.IsNullOrEmpty(text))
+                return;
+
+            if (lineOffset >= PaddedHeight) 
+                return;
+
+            Console.SetCursorPosition(X, Y + lineOffset);
+            Console.ForegroundColor = foreground;
+            Console.BackgroundColor = background ?? BackgroundColor;
+
+            if (text.Length > PaddedWidth)
+                text = text.Substring(0, PaddedWidth);
+            else
+                text = text.PadRight(PaddedWidth);
+
+            Console.Write(text);
+            Console.ResetColor();
+        }
+        public void WriteLine(string leftText, string rightText, int lineOffset = 0, ConsoleColor leftForeground = ConsoleColor.Gray, ConsoleColor rightForeground = ConsoleColor.Gray, ConsoleColor? background = null)
+        {
+            if (lineOffset >= PaddedHeight)
+                return;
+
+            Console.SetCursorPosition(X, Y + lineOffset);
+            Console.BackgroundColor = background ?? BackgroundColor;
+
+            int totalLength = (leftText?.Length ?? 0) + (rightText?.Length ?? 0);
+
+            if (totalLength > PaddedWidth)
+            {
+                int leftMaxLength = PaddedWidth - (rightText?.Length ?? 0);
+                if (leftMaxLength > 0 && leftText != null)
+                {
+                    leftText = leftText.Substring(0, Math.Min(leftText.Length, leftMaxLength));
+                }
+                else
+                {
+                    leftText = "";
+                }
+
+                if (rightText != null && rightText.Length > PaddedWidth)
+                {
+                    rightText = rightText.Substring(0, PaddedWidth);
+                }
+            }
+
+            int spacing = PaddedWidth - PaddingX - (leftText?.Length ?? 0) - (rightText?.Length ?? 0);
+
+            if (!string.IsNullOrEmpty(leftText))
+            {
+                Console.ForegroundColor = leftForeground;
+                Console.Write(leftText);
+            }
+
+            Console.Write(new string(' ', spacing));
+
+            if (!string.IsNullOrEmpty(rightText))
+            {
+                Console.ForegroundColor = rightForeground;
+                Console.Write(rightText);
+            }
+
+            Console.ResetColor();
+        }
+        public void Clear(int lineOffset)
+        {
+            if (lineOffset >= PaddedHeight) return;
+
+            Console.SetCursorPosition(X, Y + lineOffset);
+            Console.BackgroundColor = BackgroundColor;
+            Console.Write(new string(' ', PaddedWidth));
+            Console.ResetColor();
+        }
+
+        public void ClearAll()
+        {
+            for (int i = 0; i < PaddedHeight; i++)
+            {
+                Clear(i);
+            }
+        }
+    }
+
+    public struct IPoint
+    {
+        public int X;
+        public int Y;
+    }
+
+    public class BorderContainer
     {
         private readonly int _width;
-        private readonly List<Action> _drawActions = new();
-        private string? _topBorderText = null;
-        private ConsoleColor? _topBorderTextColor = null;
-        private ConsoleColor? _borderBackgroundColor = null;
-        private ConsoleColor? _contentBackgroundColor = null;
-        private ConsoleColor? _borderForegroundColor = null;
+        private string? _title = null;
+        private ConsoleColor _borderColor = ConsoleColor.DarkGray;
+        private ConsoleColor _titleColor = ConsoleColor.Yellow;
+        private ConsoleColor _backgroundColor = ConsoleColor.Black;
+        private List<Cell> _cells = new List<Cell>();
 
-        public BorderBuilder(int width)
+        public BorderContainer(int width)
         {
             _width = width;
         }
 
-        public BorderBuilder WithTopBorderText(string text, ConsoleColor? color = null)
+        public BorderContainer WithTitle(string title, ConsoleColor color = ConsoleColor.White)
         {
-            _topBorderText = text;
-            _topBorderTextColor = color;
+            _title = title;
+            _titleColor = color;
             return this;
         }
 
-        public BorderBuilder WithBorderBackground(ConsoleColor color)
+        public BorderContainer WithBorderColor(ConsoleColor color)
         {
-            _borderBackgroundColor = color;
+            _borderColor = color;
             return this;
         }
 
-        public BorderBuilder WithBorderColor(ConsoleColor color)
+        public BorderContainer WithBackgroundColor(ConsoleColor color)
         {
-            _borderForegroundColor = color;
+            _backgroundColor = color;
             return this;
         }
 
-        public BorderBuilder WithContentBackground(ConsoleColor color)
-        {
-            _contentBackgroundColor = color;
-            return this;
-        }
 
-        public BorderBuilder GetCenter(out int startLeft, out int startTop)
+        public BorderContainer AddCell(int height, out Cell cell, int padding = 0)
         {
-            int windowWidth = Console.WindowWidth;
-            startLeft = Math.Max(0, (windowWidth - _width) / 2);
-
-            int windowHeight = Console.WindowHeight;
-            int totalLines = 2 + _drawActions.Count;
-            startTop = Math.Max(0, (windowHeight - totalLines) / 2);
-            return this;
-        }
-
-        public BorderBuilder AddLine(
-            string leftText,
-            string rightText,
-            ConsoleColor leftColor,
-            ConsoleColor rightColor)
-        {
-            _drawActions.Add(() =>
+            cell = new Cell
             {
-                if (_borderBackgroundColor.HasValue)
-                    Console.BackgroundColor = _borderBackgroundColor.Value;
-                if (_borderForegroundColor.HasValue)
-                    Console.ForegroundColor = _borderForegroundColor.Value;
-                Console.Write(Vertical);
-                Console.ResetColor();
+                PaddingY = padding,
+                PaddingX = padding,
+                Height = height,
+            };
 
-                if (_contentBackgroundColor.HasValue)
-                    Console.BackgroundColor = _contentBackgroundColor.Value;
-                else if (_borderBackgroundColor.HasValue)
-                    Console.BackgroundColor = _borderBackgroundColor.Value;
-                Console.Write(" ");
-
-                int contentWidth = _width - 4;
-
-                if (leftText.Length + rightText.Length > contentWidth)
-                {
-                    int maxLeft = contentWidth - rightText.Length;
-                    if (maxLeft < 0) maxLeft = 0;
-                    leftText = leftText.Substring(0, Math.Min(leftText.Length, maxLeft));
-                }
-
-                int spaceBetween =
-                    contentWidth - leftText.Length - rightText.Length;
-
-                Console.ForegroundColor = leftColor;
-                Console.Write(leftText);
-
-                Console.ForegroundColor = ConsoleColor.Gray;
-                if (spaceBetween > 0)
-                    Console.Write(new string(' ', spaceBetween));
-
-                Console.ForegroundColor = rightColor;
-                Console.Write(rightText);
-
-                Console.ForegroundColor = ConsoleColor.Gray;
-                Console.Write(" ");
-
-                if (_borderBackgroundColor.HasValue)
-                    Console.BackgroundColor = _borderBackgroundColor.Value;
-                else
-                    Console.ResetColor();
-                if (_borderForegroundColor.HasValue)
-                    Console.ForegroundColor = _borderForegroundColor.Value;
-                Console.Write(Vertical);
-                Console.ResetColor();
-                Console.WriteLine();
-            });
+            _cells.Add(cell);
 
             return this;
         }
 
-        public BorderBuilder AddLine(string? text, ConsoleColor? color = null)
+        public void Draw(bool centered = false)
         {
-            _drawActions.Add(() =>
-            {
-                if (_borderBackgroundColor.HasValue)
-                    Console.BackgroundColor = _borderBackgroundColor.Value;
-                if (_borderForegroundColor.HasValue)
-                    Console.ForegroundColor = _borderForegroundColor.Value;
-                Console.Write(Vertical);
-                Console.ResetColor();
+            int totalHeight = 2;
+            totalHeight += _cells.Sum(c => c.Height);
+            totalHeight += _cells.Count - 1;
 
-                if (_contentBackgroundColor.HasValue)
-                    Console.BackgroundColor = _contentBackgroundColor.Value;
-                else if (_borderBackgroundColor.HasValue)
-                    Console.BackgroundColor = _borderBackgroundColor.Value;
-                if (color.HasValue)
-                    Console.ForegroundColor = color.Value;
-                Console.Write(" " + (text ?? string.Empty).PadRight(_width - 4) + " ");
-
-                if (_borderBackgroundColor.HasValue)
-                    Console.BackgroundColor = _borderBackgroundColor.Value;
-                else
-                    Console.ResetColor();
-                if (_borderForegroundColor.HasValue)
-                    Console.ForegroundColor = _borderForegroundColor.Value;
-                Console.Write(Vertical);
-                Console.ResetColor();
-                Console.WriteLine();
-            });
-            return this;
-        }
-
-        public BorderBuilder AddSelectedLine(string text)
-        {
-            _drawActions.Add(() =>
-            {
-                if (_borderBackgroundColor.HasValue)
-                    Console.BackgroundColor = _borderBackgroundColor.Value;
-                if (_borderForegroundColor.HasValue)
-                    Console.ForegroundColor = _borderForegroundColor.Value;
-                Console.Write(Vertical);
-                Console.ResetColor();
-
-                Console.BackgroundColor = ConsoleColor.Yellow;
-                Console.ForegroundColor = ConsoleColor.Black;
-                Console.Write(" ");
-                Console.Write(text.PadRight(_width - 4));
-                Console.Write(" ");
-
-                if (_borderBackgroundColor.HasValue)
-                    Console.BackgroundColor = _borderBackgroundColor.Value;
-                else
-                    Console.ResetColor();
-                if (_borderForegroundColor.HasValue)
-                    Console.ForegroundColor = _borderForegroundColor.Value;
-                Console.Write(Vertical);
-                Console.ResetColor();
-                Console.WriteLine();
-            });
-            return this;
-        }
-
-        public BorderBuilder AddEmptyLine()
-        {
-            _drawActions.Add(() =>
-            {
-                if (_borderBackgroundColor.HasValue)
-                    Console.BackgroundColor = _borderBackgroundColor.Value;
-                if (_borderForegroundColor.HasValue)
-                    Console.ForegroundColor = _borderForegroundColor.Value;
-                Console.Write(Vertical);
-                Console.ResetColor();
-
-                if (_contentBackgroundColor.HasValue)
-                    Console.BackgroundColor = _contentBackgroundColor.Value;
-                else if (_borderBackgroundColor.HasValue)
-                    Console.BackgroundColor = _borderBackgroundColor.Value;
-                Console.Write(new string(' ', _width - 2));
-
-                if (_borderBackgroundColor.HasValue)
-                    Console.BackgroundColor = _borderBackgroundColor.Value;
-                else
-                    Console.ResetColor();
-                if (_borderForegroundColor.HasValue)
-                    Console.ForegroundColor = _borderForegroundColor.Value;
-                Console.Write(Vertical);
-                Console.ResetColor();
-                Console.WriteLine();
-            });
-            return this;
-        }
-
-        public BorderBuilder AddSeparator()
-        {
-            _drawActions.Add(() =>
-            {
-                if (_borderBackgroundColor.HasValue)
-                    Console.BackgroundColor = _borderBackgroundColor.Value;
-                if (_borderForegroundColor.HasValue)
-                    Console.ForegroundColor = _borderForegroundColor.Value;
-                Console.Write(VerticalRight);
-                Console.Write(new string(Horizontal, _width - 2));
-                Console.Write(VerticalLeft);
-                Console.ResetColor();
-                Console.WriteLine();
-            });
-            return this;
-        }
-
-        public int Draw(bool centered = false)
-        {
-            int startLeft = 0;
-            int startTop = Console.CursorTop;
+            int left = 0;
+            int top = 0;
 
             if (centered)
             {
-                GetCenter(out startLeft, out startTop);
+                left = Math.Max(0, (Console.WindowWidth - _width) / 2);
+                top = Math.Max(0, (Console.WindowHeight - totalHeight) / 2);
             }
 
-            if (!string.IsNullOrWhiteSpace(_topBorderText))
+            int contentWidth = _width - 2;
+
+            Console.SetCursorPosition(left, top);
+            Console.ForegroundColor = _borderColor;
+
+            if (!string.IsNullOrWhiteSpace(_title))
             {
-                string text = _topBorderText;
+                string text = _title;
                 int maxTextLength = _width - 6;
                 if (text.Length > maxTextLength)
                     text = text.Substring(0, maxTextLength);
 
-                int contentWidth = _width - 2;
                 int textBlockWidth = text.Length + 2;
                 int remaining = contentWidth - textBlockWidth;
-
                 int leftLineLength = remaining / 2;
                 int rightLineLength = remaining - leftLineLength;
 
-                Console.SetCursorPosition(startLeft, startTop);
-                if (_borderBackgroundColor.HasValue)
-                    Console.BackgroundColor = _borderBackgroundColor.Value;
-                if (_borderForegroundColor.HasValue)
-                    Console.ForegroundColor = _borderForegroundColor.Value;
+                Console.BackgroundColor = _backgroundColor;
                 Console.Write(TopLeft);
                 Console.Write(new string(Horizontal, leftLineLength));
                 Console.Write(' ');
-
-                if (_topBorderTextColor.HasValue)
-                    Console.ForegroundColor = _topBorderTextColor.Value;
-                else if (_borderForegroundColor.HasValue)
-                    Console.ForegroundColor = _borderForegroundColor.Value;
+                Console.ForegroundColor = _titleColor;
                 Console.Write(text);
-                Console.ResetColor();
-                if (_borderBackgroundColor.HasValue)
-                    Console.BackgroundColor = _borderBackgroundColor.Value;
-                if (_borderForegroundColor.HasValue)
-                    Console.ForegroundColor = _borderForegroundColor.Value;
-
+                Console.ForegroundColor = _borderColor;
                 Console.Write(' ');
                 Console.Write(new string(Horizontal, rightLineLength));
                 Console.Write(TopRight);
-                Console.ResetColor();
-                Console.WriteLine();
             }
             else
             {
-                Console.SetCursorPosition(startLeft, startTop);
-                if (_borderBackgroundColor.HasValue)
-                    Console.BackgroundColor = _borderBackgroundColor.Value;
-                if (_borderForegroundColor.HasValue)
-                    Console.ForegroundColor = _borderForegroundColor.Value;
+                Console.BackgroundColor = _backgroundColor;
                 Console.Write(TopLeft);
-                Console.Write(new string(Horizontal, _width - 2));
+                Console.Write(new string(Horizontal, contentWidth));
                 Console.Write(TopRight);
-                Console.ResetColor();
-                Console.WriteLine();
             }
+            Console.ResetColor();
 
-            int linesDrawn = 1;
+            int currentY = top + 1;
 
-            foreach (var action in _drawActions)
+            for (int i = 0; i < _cells.Count; i++)
             {
-                Console.SetCursorPosition(startLeft, startTop + linesDrawn);
-                action();
-                linesDrawn++;
+                var cellDef = _cells[i];
+
+                cellDef.X = left + 1 + cellDef.PaddingX;
+                cellDef.Y = currentY + cellDef.PaddingY;
+                cellDef.Height = cellDef.Height + cellDef.PaddingY * 2;
+                cellDef.Width = contentWidth;
+                cellDef.BackgroundColor = _backgroundColor;
+
+                for (int j = 0; j < cellDef.Height; j++)
+                {
+                    Console.SetCursorPosition(left, currentY + j);
+                    Console.ForegroundColor = _borderColor;
+                    Console.BackgroundColor = _backgroundColor;
+                    Console.Write(Vertical);
+                    Console.Write(new string(' ', contentWidth));
+                    Console.Write(Vertical);
+                    Console.ResetColor();
+                }
+
+                currentY += cellDef.Height;
+
+                if (i < _cells.Count - 1)
+                {
+                    Console.SetCursorPosition(left, currentY);
+                    Console.ForegroundColor = _borderColor;
+                    Console.BackgroundColor = _backgroundColor;
+                    Console.Write(VerticalRight);
+                    Console.Write(new string(Horizontal, contentWidth));
+                    Console.Write(VerticalLeft);
+                    Console.ResetColor();
+                    currentY++;
+                }
             }
 
-            Console.SetCursorPosition(startLeft, startTop + linesDrawn);
-            if (_borderBackgroundColor.HasValue)
-                Console.BackgroundColor = _borderBackgroundColor.Value;
-            if (_borderForegroundColor.HasValue)
-                Console.ForegroundColor = _borderForegroundColor.Value;
+            Console.SetCursorPosition(left, currentY);
+            Console.ForegroundColor = _borderColor;
+            Console.BackgroundColor = _backgroundColor;
             Console.Write(BottomLeft);
-            Console.Write(new string(Horizontal, _width - 2));
+            Console.Write(new string(Horizontal, contentWidth));
             Console.Write(BottomRight);
             Console.ResetColor();
-            Console.WriteLine();
-            linesDrawn++;
-
-            return linesDrawn;
         }
     }
 }
