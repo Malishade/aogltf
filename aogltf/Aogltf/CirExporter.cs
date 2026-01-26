@@ -18,7 +18,7 @@ namespace aogltf
         public CirExporter(RdbController rdbController)
         {
             _rdbController = rdbController;
-            _catMeshToAnimIds = CatMeshToAnimIdSerializer.DeserializeCompressed(File.ReadAllBytes("CatMeshToAnimId.bin"));
+            _catMeshToAnimIds = CatMeshToAnimIdSerializer.DeserializeCompressed(File.ReadAllBytes("Aogltf\\CatMeshToAnimId.bin"));
         }
 
         public void ExportGltf(string outputFolder, int meshId)

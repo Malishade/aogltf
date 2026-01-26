@@ -11,7 +11,7 @@
     <Reference Include="Lib\ConsoleUI.dll" />
   </ItemGroup>
   <ItemGroup>
-    <None Update="CatMeshToAnimId.bin">
+    <None Update="Aogltf\CatMeshToAnimId.bin">
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </None>
   </ItemGroup>
