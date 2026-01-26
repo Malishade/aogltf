@@ -73,7 +73,6 @@ internal class Program
                 ExportOption.Exit => "Exit",
                 _ => opt.ToString()
             })
-            .WithLoop()
             .OnSelect(exportType =>
             {
                 switch (exportType)
@@ -102,41 +101,34 @@ internal class Program
 
     private static void DumpNames(RdbController rdbController, string exportDir)
     {
+        var names = rdbController.GetNames();
+
+        ConsoleLoadingMenu
+            .Create(_title, $"Exporting abiff / cir names ...")
+            .WithSuccessMessage(objectName => $"Names exported to : {exportDir}")
+            .WithErrorMessage(error => $"Failed to export names: {error}")
+            .Show(() => {
+                bool success = SaveNameJson(names[AODB.Common.RDBObjects.ResourceTypeId.CatMesh], exportDir, "CirNames") &&
+                SaveNameJson(names[AODB.Common.RDBObjects.ResourceTypeId.RdbMesh], exportDir, "AbiffNames");
+                return (success);
+            });
+    }
+
+    private static bool SaveNameJson(Dictionary<int,string> names, string exportDir, string fileName)
+    {
         try
         {
-            Console.ForegroundColor = ConsoleColor.Yellow;
-            Console.WriteLine("Dumping names...");
-            Console.ResetColor();
-
-            var names = rdbController.GetNames();
-
-            File.WriteAllText(Path.Combine(exportDir, "CirNames.json"),
-                JsonSerializer.Serialize(names[AODB.Common.RDBObjects.ResourceTypeId.CatMesh],
-                new JsonSerializerOptions
-                {
-                    WriteIndented = true
-                }));
-
-            File.WriteAllText(Path.Combine(exportDir, "AbiffNames.json"),
-                JsonSerializer.Serialize(names[AODB.Common.RDBObjects.ResourceTypeId.RdbMesh],
-                new JsonSerializerOptions
-                {
-                    WriteIndented = true
-                }));
-
-            Console.ForegroundColor = ConsoleColor.Green;
-            Console.WriteLine($"Names dumped successfully to {Path.Combine(exportDir, "CirNames.json")}");
-            Console.WriteLine($"Names dumped successfully to {Path.Combine(exportDir, "AbiffNames.json")}");
-            Console.ResetColor();
+            var jsonOptions = new JsonSerializerOptions
+            {
+                WriteIndented = true
+            };
+            File.WriteAllText(Path.Combine(exportDir, $"{fileName}.json"), JsonSerializer.Serialize(names, jsonOptions));
+            return true;
         }
         catch (Exception ex)
         {
-            Console.ForegroundColor = ConsoleColor.Red;
-            Console.WriteLine($"Dump failed: {ex.Message}");
-            Console.ResetColor();
+            return false;
         }
-
-        Console.WriteLine();
     }
 
     private static void HandleBrowser(RdbController rdbController, string exportDir, bool isCir)
@@ -148,10 +140,9 @@ internal class Program
                 ? AODB.Common.RDBObjects.ResourceTypeId.CatMesh
                 : AODB.Common.RDBObjects.ResourceTypeId.RdbMesh;
 
-            var modelDict = names[resourceType];
             ConsoleSelectionMenu
                 .Create<KeyValuePair<int, string>>()
-                .WithItems(modelDict)
+                .WithItems(names[resourceType])
                 .WithDynamicHeight()
                 .WithShowInfo()
                 .WithTitle(isCir ? "Cir Browser" : "Abiff Browser")
@@ -160,45 +151,21 @@ internal class Program
                     kvp.Value.Contains(search, StringComparison.OrdinalIgnoreCase) ||
                     kvp.Key.ToString().Contains(search))
                 .EnableSearch()
-                .WithLoop()
                 .OnSelect(searchResult =>
                 {
                     var modelId = searchResult.Key;
-                    Console.Clear();
 
-                    try
-                    {
-                        bool success = false;
-                        string objectName = string.Empty;
-                        Console.ResetColor();
+                    ConsoleLoadingMenu
+                        .Create(_title, $"Exporting model {modelId}...")
+                        .WithSuccessMessage(objectName => $"Model exported to: {exportDir}\\{objectName}.glb")
+                        .WithErrorMessage(error => $"Failed to export model {modelId}: {error}")
+                        .Show(() => {
+                            bool success = isCir
+                                ? new CirExporter(rdbController).ExportGlb(exportDir, modelId, out string objectName)
+                                : new AbiffExporter(rdbController).ExportGlb(exportDir, modelId, out objectName);
 
-                        var border = ConsoleBorder
-                            .Create(80)
-                            .AddCell(1, out var cell, 1)
-                            .WithTitle(_title);
-
-                        border.Draw(centered: true);
-
-                        using (var spinner = new ConsoleSpinner($"Exporting model {modelId}...", SpinnerStyle.Line))
-                        {
-                            spinner.Start(text => cell.WriteLine(text, 0, foreground: ConsoleColor.Yellow));
-
-                            success = isCir ?
-                                new CirExporter(rdbController).ExportGlb(exportDir, modelId, out objectName) :
-                                new AbiffExporter(rdbController).ExportGlb(exportDir, modelId, out objectName);
-
-                            spinner.Stop();
-                        }
-
-                        cell.WriteLine(success ? $"Saved at: {exportDir}\\{objectName}.glb" : $"Resource with id {modelId} not found in database / parser error", foreground: success ? ConsoleColor.Green : ConsoleColor.Red);
-                        Console.ReadKey();
-                    }
-                    catch (Exception ex)
-                    {
-                        Console.ForegroundColor = ConsoleColor.Red;
-                        Console.WriteLine($"Export failed: {ex.Message}");
-                        Console.ResetColor();
-                    }
+                            return (success, objectName);
+                        });
 
                     return true;
                 })

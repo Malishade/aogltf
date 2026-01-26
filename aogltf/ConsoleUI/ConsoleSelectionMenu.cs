@@ -16,7 +16,6 @@ internal static class ConsoleSelectionMenu
         private Func<string, T, bool>? _filterFunc = null;
         private bool _enableSearch = false;
         private Func<T, bool>? _onSelect = null;
-        private bool _loop = false;
         private bool _showInfo = false;
         private bool _escapePressed = false;
         private int _borderWidth = 80;
@@ -25,8 +24,8 @@ internal static class ConsoleSelectionMenu
 
         public class MenuItem<TValue>
         {
-            public TValue Value { get; set; }
-            public string Display { get; set; }
+            public TValue Value;
+            public string Display;
 
             public MenuItem(TValue value, string display)
             {
@@ -76,11 +75,6 @@ internal static class ConsoleSelectionMenu
             return this;
         }
 
-        public SelectionMenu<T> WithLoop(bool loop = true)
-        {
-            _loop = loop;
-            return this;
-        }
         public SelectionMenu<T> WithShowInfo(bool showInfo = true)
         {
             _showInfo = showInfo;
@@ -106,11 +100,6 @@ internal static class ConsoleSelectionMenu
         }
 
         public T? Show()
-        {
-            return _loop ? ShowLoop() : ShowOnce();
-        }
-
-        private T? ShowLoop()
         {
             while (true)
             {
@@ -139,7 +128,7 @@ internal static class ConsoleSelectionMenu
         private T? ShowOnce()
         {
             _escapePressed = false;
-            _items = _items.Select(item => new MenuItem<T>(item.Value, _displayFunc(item.Value))).ToList();
+            _items = [.. _items.Select(item => new MenuItem<T>(item.Value, _displayFunc(item.Value)))];
 
             var border = ConsoleBorder
                 .Create(_borderWidth)
