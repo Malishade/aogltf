@@ -25,12 +25,13 @@ internal class Program
 
         string configPath = Path.Combine(AppContext.BaseDirectory, "config.json");
         Config config = Config.LoadConfig(configPath);
+        RdbController rdbController;
 
         ConsoleInputPrompt
             .Create()
             .WithTitle(_title)
             .WithPrompt("Anarchy Online installation path:")
-            .WithDefaultValue(config.AoPath)
+            .WithDefaultValue(string.IsNullOrEmpty(config.AoPath) ? "" : config.AoPath)
             .WithValidator(path =>
             {
                 if (!Directory.Exists(path))
@@ -56,7 +57,7 @@ internal class Program
             })
             .Show();
 
-        var rdbController = new RdbController(config.AoPath!);
+        rdbController = new RdbController(config.AoPath!);
         string exportDir = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.Desktop), "AOExport");
         Directory.CreateDirectory(exportDir);
 
