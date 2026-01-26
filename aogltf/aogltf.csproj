@@ -6,8 +6,9 @@
     <Nullable>enable</Nullable>
   </PropertyGroup>
   <ItemGroup>
-    <Reference Include="Libraries\AODB.dll" />
-    <Reference Include="Libraries\AODB.Common.dll" />
+    <Reference Include="libs\AODB.dll" />
+    <Reference Include="libs\AODB.Common.dll" />
+    <Reference Include="libs\ConsoleUI.dll" />
   </ItemGroup>
   <ItemGroup>
     <None Update="CatMeshToAnimId.bin">
