@@ -80,7 +80,7 @@ internal class Program
                     case ExportOption.Exit:
                         return false;
                     case ExportOption.DumpIds:
-                        DumpNames(rdbController, exportDir);
+                        HandleNameDump(rdbController, exportDir);
                         return true;
                     case ExportOption.CirExport:
                         HandleBrowser(rdbController, exportDir, true);
@@ -99,7 +99,7 @@ internal class Program
         Console.ResetColor();
     }
 
-    private static void DumpNames(RdbController rdbController, string exportDir)
+    private static void HandleNameDump(RdbController rdbController, string exportDir)
     {
         var names = rdbController.GetNames();
 
@@ -133,49 +133,40 @@ internal class Program
 
     private static void HandleBrowser(RdbController rdbController, string exportDir, bool isCir)
     {
-        try
-        {
-            var names = rdbController.GetNames();
-            var resourceType = isCir
-                ? AODB.Common.RDBObjects.ResourceTypeId.CatMesh
-                : AODB.Common.RDBObjects.ResourceTypeId.RdbMesh;
+        var names = rdbController.GetNames();
+        var resourceType = isCir
+            ? AODB.Common.RDBObjects.ResourceTypeId.CatMesh
+            : AODB.Common.RDBObjects.ResourceTypeId.RdbMesh;
 
-            ConsoleSelectionMenu
-                .Create<KeyValuePair<int, string>>()
-                .WithItems(names[resourceType])
-                .WithDynamicHeight()
-                .WithShowInfo()
-                .WithTitle(isCir ? "Cir Browser" : "Abiff Browser")
-                .WithDisplayFunc(kvp => $"{kvp.Key} - {kvp.Value}")
-                .WithFilterFunc((search, kvp) =>
-                    kvp.Value.Contains(search, StringComparison.OrdinalIgnoreCase) ||
-                    kvp.Key.ToString().Contains(search))
-                .EnableSearch()
-                .OnSelect(searchResult =>
-                {
-                    var modelId = searchResult.Key;
+        ConsoleSelectionMenu
+            .Create<KeyValuePair<int, string>>()
+            .WithItems(names[resourceType])
+            .WithDynamicHeight()
+            .WithShowInfo()
+            .WithTitle(isCir ? "Cir Browser" : "Abiff Browser")
+            .WithDisplayFunc(kvp => $"{kvp.Key} - {kvp.Value}")
+            .WithFilterFunc((search, kvp) =>
+                kvp.Value.Contains(search, StringComparison.OrdinalIgnoreCase) ||
+                kvp.Key.ToString().Contains(search))
+            .EnableSearch()
+            .OnSelect(searchResult =>
+            {
+                var modelId = searchResult.Key;
 
-                    ConsoleLoadingMenu
-                        .Create(_title, $"Exporting model {modelId}...")
-                        .WithSuccessMessage(objectName => $"Model exported to: {exportDir}\\{objectName}.glb")
-                        .WithErrorMessage(error => $"Failed to export model {modelId}: {error}")
-                        .Show(() => {
-                            bool success = isCir
-                                ? new CirExporter(rdbController).ExportGlb(exportDir, modelId, out string objectName)
-                                : new AbiffExporter(rdbController).ExportGlb(exportDir, modelId, out objectName);
+                ConsoleLoadingMenu
+                    .Create(_title, $"Exporting model {modelId}...")
+                    .WithSuccessMessage(objectName => $"Model exported to: {exportDir}\\{objectName}.glb")
+                    .WithErrorMessage(error => $"Failed to export model {modelId}: {error}")
+                    .Show(() => {
+                        bool success = isCir
+                            ? new CirExporter(rdbController).ExportGlb(exportDir, modelId, out string objectName)
+                            : new AbiffExporter(rdbController).ExportGlb(exportDir, modelId, out objectName);
 
-                            return (success, objectName);
-                        });
+                        return (success, objectName);
+                    });
 
-                    return true;
-                })
-                .Show();
-        }
-        catch (Exception ex)
-        {
-            Console.ForegroundColor = ConsoleColor.Red;
-            Console.WriteLine($"Browse failed: {ex.Message}");
-            Console.ResetColor();
-        }
+                return true;
+            })
+            .Show();
     }
 }
