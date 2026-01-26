@@ -107,7 +107,8 @@ internal class Program
             .Create(_title, $"Exporting abiff / cir names ...")
             .WithSuccessMessage(objectName => $"Names exported to : {exportDir}")
             .WithErrorMessage(error => $"Failed to export names: {error}")
-            .Show(() => {
+            .Show(() => 
+            {
                 bool success = SaveNameJson(names[AODB.Common.RDBObjects.ResourceTypeId.CatMesh], exportDir, "CirNames") &&
                 SaveNameJson(names[AODB.Common.RDBObjects.ResourceTypeId.RdbMesh], exportDir, "AbiffNames");
                 return (success);
@@ -155,31 +156,32 @@ internal class Program
                 var modelId = searchResult.Key;
 
                 ConsoleSelectionMenu
-                .Create<FileFormat>()
-                .WithBorderWidth(35)
-                .WithItems(Enum.GetValues<FileFormat>())
-                .WithTitle("Select file format")
-                .WithDisplayFunc(opt => opt switch
-                {
-                    FileFormat.Glb => "Glb",
-                    FileFormat.Gltf => "Gltf",
-                    _ => opt.ToString()
-                })
-                .OnSelect(fileFormat =>
-                {
-                    ConsoleLoadingMenu
-                        .Create(_title, $"Exporting model {modelId}...")
-                        .WithSuccessMessage(objectName => $"Model exported to: {exportDir}\\{objectName}.{fileFormat.ToString().ToLower()}")
-                        .WithErrorMessage(error => $"Failed to export model {modelId}: {error}")
-                        .Show(() => {
-                            bool success = isCir
-                                ? new CirExporter(rdbController).Export(exportDir, modelId, fileFormat, out string objectName)
-                                : new AbiffExporter(rdbController).Export(exportDir, modelId, fileFormat, out objectName);
+                    .Create<FileFormat>()
+                    .WithBorderWidth(35)
+                    .WithItems(Enum.GetValues<FileFormat>())
+                    .WithTitle("Select file format")
+                    .WithDisplayFunc(opt => opt switch
+                    {
+                        FileFormat.Glb => "Glb",
+                        FileFormat.Gltf => "Gltf",
+                        _ => opt.ToString()
+                    })
+                    .OnSelect(fileFormat =>
+                    {
+                        ConsoleLoadingMenu
+                            .Create(_title, $"Exporting model {modelId}...")
+                            .WithSuccessMessage(objectName => $"Model exported to: {exportDir}\\{objectName}.{fileFormat.ToString().ToLower()}")
+                            .WithErrorMessage(error => $"Failed to export model {modelId}: {error}")
+                            .Show(() => 
+                            {
+                                bool success = isCir
+                                    ? new CirExporter(rdbController).Export(exportDir, modelId, fileFormat, out string objectName)
+                                    : new AbiffExporter(rdbController).Export(exportDir, modelId, fileFormat, out objectName);
 
-                            return (success, objectName);
-                        });
-                })
-                .Show();
+                                return (success, objectName);
+                            });
+                    })
+                    .Show();
             })
             .Show();
     }
