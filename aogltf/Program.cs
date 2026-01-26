@@ -57,9 +57,43 @@ internal class Program
             })
             .Show();
 
+        ConsoleInputPrompt
+            .Create()
+            .WithTitle(_title)
+            .WithPrompt("Export path:")
+            .WithDefaultValue(string.IsNullOrEmpty(config.ExportPath) ? 
+                Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.Desktop), "AOExport") : 
+                config.ExportPath)
+            .WithValidator(path =>
+            {
+                if (string.IsNullOrWhiteSpace(path))
+                    return (false, "Path is empty");
+
+                try
+                {
+                    var fullPath = Path.GetFullPath(path);
+                    var root = Path.GetPathRoot(fullPath);
+                    
+                    if (string.IsNullOrEmpty(root) || !Directory.Exists(root))
+                        return (false, $"Drive does not exist: {root}");
+
+                    Directory.CreateDirectory(fullPath);
+
+                    return (true, "Success");
+                }
+                catch (Exception ex)
+                {
+                    return (false, ex.Message);
+                }
+            })
+            .OnInput(exportPath =>
+            {
+                config.ExportPath = exportPath;
+                config.SaveConfig(configPath);
+            })
+            .Show();
+
         rdbController = new RdbController(config.AoPath!);
-        string exportDir = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.Desktop), "AOExport");
-        Directory.CreateDirectory(exportDir);
 
         ConsoleSelectionMenu
             .Create<ExportOption>()
@@ -81,13 +115,13 @@ internal class Program
                     case ExportOption.Exit:
                         return false;
                     case ExportOption.DumpIds:
-                        HandleNameDump(rdbController, exportDir);
+                        HandleNameDump(rdbController, config.ExportPath);
                         return true;
                     case ExportOption.CirExport:
-                        HandleBrowser(rdbController, exportDir, true);
+                        HandleBrowser(rdbController, config.ExportPath, true);
                         return true;
                     case ExportOption.AbiffExport:
-                        HandleBrowser(rdbController, exportDir, false);
+                        HandleBrowser(rdbController, config.ExportPath, false);
                         return true;
                     default:
                         return true;

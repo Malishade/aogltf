@@ -5,6 +5,7 @@ namespace aogltf;
 internal class Config
 {
     public string? AoPath { get; set; }
+    public string? ExportPath { get; set; }
 
     public static Config LoadConfig(string configPath)
     {
