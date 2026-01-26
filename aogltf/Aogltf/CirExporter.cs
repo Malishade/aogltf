@@ -3,6 +3,11 @@ using AODB.Common.RDBObjects;
 
 namespace aogltf
 {
+    public enum FileFormat
+    {
+        Glb,
+        Gltf
+    }
 
     public class AnimData
     {
@@ -18,19 +23,33 @@ namespace aogltf
         public CirExporter(RdbController rdbController)
         {
             _rdbController = rdbController;
-            _catMeshToAnimIds = CatMeshToAnimIdSerializer.DeserializeCompressed(File.ReadAllBytes("Aogltf\\CatMeshToAnimId.bin"));
+            var path = Path.Combine(AppContext.BaseDirectory, "Aogltf", "CatMeshToAnimId.bin");
+            _catMeshToAnimIds = CatMeshToAnimIdSerializer.DeserializeCompressed(File.ReadAllBytes(path));
         }
 
-        public void ExportGltf(string outputFolder, int meshId)
+        public bool Export(string outputFolder, int meshId, FileFormat format, out string objectName)
+        {
+            objectName = string.Empty;
+
+            return format switch
+            {
+                FileFormat.Gltf => ExportGltf(outputFolder, meshId, out objectName),
+                FileFormat.Glb => ExportGlb(outputFolder, meshId, out objectName),
+                _ => false,
+            };
+        }
+
+        private bool ExportGltf(string outputFolder, int meshId, out string objectName)
         {
             var catMesh = _rdbController.Get<RDBCatMesh>(meshId);
+            objectName = string.Empty;
 
             if (!GetAnimData(meshId, out var animData))
-                return;
+                return false;
 
             var sceneBuilder = new CirSceneBuilder(catMesh, animData);
             var meshProcessor = new CirMeshProcessor(catMesh);
-            var objectName = GetCatMeshName(_rdbController, meshId);
+            objectName = GetCatMeshName(_rdbController, meshId);
 
             SceneData sceneData = sceneBuilder.BuildSceneHierarchy(out var boneNodes);
             meshProcessor.ProcessMeshData(sceneData, boneNodes);
@@ -50,9 +69,10 @@ namespace aogltf
             File.WriteAllBytes(binPath, bufferData);
 
             GltfFileWriter.WriteToFile(Path.Combine(outputFolder, $"{objectName}.gltf"), gltf);
+            return true;
         }
 
-        public bool ExportGlb(string outputFolder, int meshId, out string objectName)
+        private bool ExportGlb(string outputFolder, int meshId, out string objectName)
         {
             objectName = string.Empty;
             RDBCatMesh? catMesh;

@@ -149,23 +149,37 @@ internal class Program
                 kvp.Value.Contains(search, StringComparison.OrdinalIgnoreCase) ||
                 kvp.Key.ToString().Contains(search))
             .EnableSearch()
+            .KeepOpen()
             .OnSelect(searchResult =>
             {
                 var modelId = searchResult.Key;
 
-                ConsoleLoadingMenu
-                    .Create(_title, $"Exporting model {modelId}...")
-                    .WithSuccessMessage(objectName => $"Model exported to: {exportDir}\\{objectName}.glb")
-                    .WithErrorMessage(error => $"Failed to export model {modelId}: {error}")
-                    .Show(() => {
-                        bool success = isCir
-                            ? new CirExporter(rdbController).ExportGlb(exportDir, modelId, out string objectName)
-                            : new AbiffExporter(rdbController).ExportGlb(exportDir, modelId, out objectName);
+                ConsoleSelectionMenu
+                .Create<FileFormat>()
+                .WithBorderWidth(35)
+                .WithItems(Enum.GetValues<FileFormat>())
+                .WithTitle("Select file format")
+                .WithDisplayFunc(opt => opt switch
+                {
+                    FileFormat.Glb => "Glb",
+                    FileFormat.Gltf => "Gltf",
+                    _ => opt.ToString()
+                })
+                .OnSelect(fileFormat =>
+                {
+                    ConsoleLoadingMenu
+                        .Create(_title, $"Exporting model {modelId}...")
+                        .WithSuccessMessage(objectName => $"Model exported to: {exportDir}\\{objectName}.{fileFormat.ToString().ToLower()}")
+                        .WithErrorMessage(error => $"Failed to export model {modelId}: {error}")
+                        .Show(() => {
+                            bool success = isCir
+                                ? new CirExporter(rdbController).Export(exportDir, modelId, fileFormat, out string objectName)
+                                : new AbiffExporter(rdbController).Export(exportDir, modelId, fileFormat, out objectName);
 
-                        return (success, objectName);
-                    });
-
-                return true;
+                            return (success, objectName);
+                        });
+                })
+                .Show();
             })
             .Show();
     }
