@@ -44,7 +44,6 @@ namespace aogltf
 
                 Vector3[] vertices;
 
-                // Only apply transform if there are no animations
                 if (!hasAnimation)
                 {
                     Matrix4x4 transform = CreateTransformMatrix(triMeshData);
@@ -52,7 +51,6 @@ namespace aogltf
                 }
                 else
                 {
-                    // If animated, use vertices as-is (transform will be handled by animation)
                     vertices = [.. simpleMesh.Vertices.Select(v => v.Position.ToNumerics())];
                 }
 

@@ -164,7 +164,6 @@ namespace aogltf
             if (_rdbMesh.Members[triMesh.anim] is not FAFAnim_t animClass)
                 return null;
 
-            // Skip single keyframe animations
             if (animClass.num_trans_keys <= 1 && animClass.num_rot_keys <= 1)
                 return null;
 

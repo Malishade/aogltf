@@ -40,9 +40,10 @@ namespace aogltf
          
             List<int> usedMaterialIndices = meshProcessor.GetUsedMaterialIndices(sceneData);
           
-            List<FAFMaterial_t> usedMaterials = [.. usedMaterialIndices
+            List<FAFMaterial_t> usedMaterials = usedMaterialIndices
                 .Where(idx => rdbMesh.Members[idx] is FAFMaterial_t)
-                .Select(idx => (FAFMaterial_t)rdbMesh.Members[idx])];
+                .Select(idx => (FAFMaterial_t)rdbMesh.Members[idx])
+                .ToList();
 
             materialBuilder.BuildMaterials(rdbMesh, usedMaterials);
             ConvertAndResolveMaterials(sceneData, rdbMesh, materialBuilder);

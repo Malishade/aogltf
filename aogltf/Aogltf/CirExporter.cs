@@ -3,12 +3,6 @@ using AODB.Common.RDBObjects;
 
 namespace aogltf
 {
-    public enum FileFormat
-    {
-        Glb,
-        Gltf
-    }
-
     public class AnimData
     {
         public string Name;
@@ -30,91 +24,49 @@ namespace aogltf
         public bool Export(string outputFolder, int meshId, FileFormat format, out string objectName)
         {
             objectName = string.Empty;
-
-            return format switch
-            {
-                FileFormat.Gltf => ExportGltf(outputFolder, meshId, out objectName),
-                FileFormat.Glb => ExportGlb(outputFolder, meshId, out objectName),
-                _ => false,
-            };
-        }
-
-        private bool ExportGltf(string outputFolder, int meshId, out string objectName)
-        {
-            var catMesh = _rdbController.Get<RDBCatMesh>(meshId);
-            objectName = string.Empty;
-
-            if (!GetAnimData(meshId, out var animData))
-                return false;
-
-            var sceneBuilder = new CirSceneBuilder(catMesh, animData);
-            var meshProcessor = new CirMeshProcessor(catMesh);
-            objectName = GetCatMeshName(_rdbController, meshId);
-
-            SceneData sceneData = sceneBuilder.BuildSceneHierarchy(out var boneNodes);
-            meshProcessor.ProcessMeshData(sceneData, boneNodes);
-
-            var materialBuilder = new CirMaterialBuilder(_rdbController, outputFolder, false);
-            materialBuilder.BuildMaterials(catMesh);
-
-            //List<int> usedMaterialIndices = meshProcessor.GetUsedMaterialIndices(sceneData);
-            ConvertAndResolveMaterials(sceneData, materialBuilder, catMesh);
-
-            var gltf = GltfBuilder.Create(sceneData, out byte[] bufferData);
-
-            materialBuilder.AddToGltf(gltf);
-            gltf.Buffers[0].Uri = $"{objectName}.bin";
-
-            var binPath = Path.Combine(outputFolder, $"{objectName}.bin");
-            File.WriteAllBytes(binPath, bufferData);
-
-            GltfFileWriter.WriteToFile(Path.Combine(outputFolder, $"{objectName}.gltf"), gltf);
-            return true;
-        }
-
-        private bool ExportGlb(string outputFolder, int meshId, out string objectName)
-        {
-            objectName = string.Empty;
-            RDBCatMesh? catMesh;
+            bool isGlb = format == FileFormat.Glb;
 
             try
             {
-                catMesh = _rdbController.Get<RDBCatMesh>(meshId);
+                var catMesh = _rdbController.Get<RDBCatMesh>(meshId);
+                if (catMesh == null || !GetAnimData(meshId, out var animData))
+                    return false;
+
+                objectName = GetCatMeshName(_rdbController, meshId);
+
+                var sceneBuilder = new CirSceneBuilder(catMesh, animData);
+                var meshProcessor = new CirMeshProcessor(catMesh);
+
+                SceneData sceneData = sceneBuilder.BuildSceneHierarchy(out var boneNodes);
+                meshProcessor.ProcessMeshData(sceneData, boneNodes);
+
+                var materialBuilder = new CirMaterialBuilder(_rdbController, outputFolder, isGlb);
+                materialBuilder.BuildMaterials(catMesh);
+                ConvertAndResolveMaterials(sceneData, catMesh, materialBuilder);
+
+                var gltf = GltfBuilder.Create(sceneData, out byte[] bufferData);
+                materialBuilder.AddToGltf(gltf);
+
+                if (isGlb)
+                {
+                    GltfFileWriter.WriteToFile(Path.Combine(outputFolder, $"{objectName}.glb"), gltf, bufferData);
+                }
+                else
+                {
+                    gltf.Buffers[0].Uri = $"{objectName}.bin";
+                    File.WriteAllBytes(Path.Combine(outputFolder, $"{objectName}.bin"), bufferData);
+                    GltfFileWriter.WriteToFile(Path.Combine(outputFolder, $"{objectName}.gltf"), gltf);
+                }
+
+                return true;
             }
             catch
             {
                 return false;
             }
-
-            if (catMesh == null)
-                return false;
-
-            if (!GetAnimData(meshId, out var animData))
-                return false;
-
-            var sceneBuilder = new CirSceneBuilder(catMesh, animData);
-            var meshProcessor = new CirMeshProcessor(catMesh);
-              objectName = GetCatMeshName(_rdbController, meshId);
-
-            SceneData sceneData = sceneBuilder.BuildSceneHierarchy(out var boneData);
-            meshProcessor.ProcessMeshData(sceneData, boneData);
-
-            var materialBuilder = new CirMaterialBuilder(_rdbController, outputFolder, true);
-            materialBuilder.BuildMaterials(catMesh);
-
-            //List<int> usedMaterialIndices = meshProcessor.GetUsedMaterialIndices(sceneData);
-            ConvertAndResolveMaterials(sceneData, materialBuilder, catMesh);
-
-            var gltf = GltfBuilder.Create(sceneData, out byte[] bufferData);
-
-            materialBuilder.AddToGltf(gltf);
-
-            GltfFileWriter.WriteToFile(Path.Combine(outputFolder, $"{objectName}.glb"), gltf, bufferData);
-
-            return true;
         }
 
-        private void ConvertAndResolveMaterials(SceneData sceneData, CirMaterialBuilder materialBuilder, RDBCatMesh catMesh)
+        private void ConvertAndResolveMaterials(SceneData sceneData, RDBCatMesh catMesh, CirMaterialBuilder materialBuilder)
         {
             var catToGltfMaterialMap = new Dictionary<int, int>();
 
@@ -140,7 +92,6 @@ namespace aogltf
                     }
 
                     int? resolvedGltfMatIndex = materialBuilder.ResolveMaterialIndex(catMatIndex, catMesh);
-
                     if (resolvedGltfMatIndex.HasValue)
                     {
                         catToGltfMaterialMap[catMatIndex] = resolvedGltfMatIndex.Value;
@@ -156,50 +107,34 @@ namespace aogltf
 
         private static string GetCatMeshName(RdbController rdbController, int id)
         {
-            return (rdbController.Get<InfoObject>(1).Types[ResourceTypeId.CatMesh].TryGetValue(id, out string? rdbName)
-                ? rdbName.Trim('\0')
-                : $"Unnamed_{id}").Replace(".cir", "");
+            return (rdbController.Get<InfoObject>(1).Types[ResourceTypeId.CatMesh].TryGetValue(id, out string? rdbName)               ? rdbName.Trim('\0')   : $"Unnamed_{id}").Replace(".cir", "");
         }
 
         private static string GetCatAnimName(RdbController rdbController, int id)
         {
-            return (rdbController.Get<InfoObject>(1).Types[ResourceTypeId.Anim].TryGetValue(id, out string? rdbName)
-                ? rdbName.Trim('\0')
-                : $"Unnamed_{id}").Replace(".ani", "");
+            return (rdbController.Get<InfoObject>(1).Types[ResourceTypeId.Anim].TryGetValue(id, out string? rdbName) ? rdbName.Trim('\0') : $"Unnamed_{id}").Replace(".ani", "");
         }
 
         private bool GetAnimData(int meshId, out List<AnimData> animData)
         {
             animData = null;
 
-            if (!_catMeshToAnimIds.TryGetValue(meshId, out List<int>? animIds))
-            {
+            if (!_catMeshToAnimIds.TryGetValue(meshId, out List<int>? animIds) || animIds == null)
                 return false;
-            }
 
-            if (animIds == null)
-            {
-                return false;
-            }
-
-            animData = new List<AnimData>();
-
-            foreach (var animId in animIds)
-            {
-                animData.Add(new AnimData
+            animData = animIds
+                .Select(animId => new AnimData
                 {
                     Name = GetCatAnimName(_rdbController, animId),
                     CatAnim = _rdbController.Get<CATAnim>(animId)
-                });
-            }
-            animData = animData
+                })
                 .OrderByDescending(x => x.Name.Contains("stand") && x.Name.Contains("idle"))
                 .ThenByDescending(x => x.Name.Contains("stand"))
                 .ThenByDescending(x => x.Name.Contains("idle"))
-                .ThenByDescending(x => x.Name.Contains("unarmed")).ToList();
+                .ThenByDescending(x => x.Name.Contains("unarmed"))
+                .ToList();
 
             return animData.Count != 0;
         }
-
     }
 }

@@ -319,4 +319,10 @@ namespace aogltf
         [JsonPropertyName("wrapT")]
         public int? WrapT { get; set; } = 10497; // REPEAT
     }
+    
+    public enum FileFormat
+    {
+        Glb,
+        Gltf
+    }
 }

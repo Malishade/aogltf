@@ -74,7 +74,6 @@ namespace aogltf
                 sceneData.Nodes.Add(_boneNodes[i]);
             }
 
-            // Build hierarchy
             for (int i = 0; i < _catMesh.Joints.Count; i++)
             {
                 var joint = _catMesh.Joints[i];
@@ -85,7 +84,6 @@ namespace aogltf
                 }
             }
 
-            // Find root bones (those without parents)
             var rootBones = new List<int>();
             for (int i = 0; i < _catMesh.Joints.Count; i++)
             {
@@ -104,7 +102,6 @@ namespace aogltf
                 }
             }
 
-            // Create a root node that contains all root bones
             var rootNode = new NodeData
             {
                 Name = "Root",
@@ -114,7 +111,6 @@ namespace aogltf
             sceneData.Nodes.Insert(0, rootNode);
             sceneData.RootNodeIndex = 0;
 
-            // Update bone indices after root insertion
             for (int i = 0; i < sceneData.Nodes.Count; i++)
             {
                 for (int j = 0; j < sceneData.Nodes[i].ChildIndices.Count; j++)
@@ -154,7 +150,7 @@ namespace aogltf
                     BaseColor = new Vector4(catMaterial.Diffuse.R, catMaterial.Diffuse.G, catMaterial.Diffuse.B, 1.0f),
                     EmissiveFactor = new Vector3(catMaterial.Emission.R, catMaterial.Emission.G, catMaterial.Emission.B),
                     MetallicFactor = 0.0f,
-                    RoughnessFactor = 1.0f - catMaterial.Sheen / 100.0f // Convert sheen to roughness
+                    RoughnessFactor = 1.0f - catMaterial.Sheen / 100.0f
                 };
 
                 sceneData.Materials.Add(materialData);
@@ -195,7 +191,7 @@ namespace aogltf
                         foreach (var key in boneData.TranslationKeys)
                         {
                             var keyframe = new KeyframeData(
-                                key.Time / 1000.0f, // Convert to seconds
+                                key.Time / 1000.0f,
                                 [key.Position.X, key.Position.Y, key.Position.Z]
                             );
                             translationChannel.Keyframes.Add(keyframe);
@@ -216,7 +212,7 @@ namespace aogltf
                         foreach (var key in boneData.RotationKeys)
                         {
                             var keyframe = new KeyframeData(
-                                key.Time / 1000.0f, // Convert to seconds
+                                key.Time / 1000.0f,
                                 [key.Rotation.X, key.Rotation.Y, key.Rotation.Z, key.Rotation.W]
                             );
                             rotationChannel.Keyframes.Add(keyframe);
