@@ -36,17 +36,16 @@ namespace aogltf
             SceneData sceneData = sceneBuilder.BuildSceneHierarchy();
             meshProcessor.ProcessMeshData(sceneData);
           
-            var materialBuilder = new AbiffMaterialBuilder(_rdbController, rdbMesh, outputFolder, false);
+            var materialBuilder = new AbiffMaterialBuilder(_rdbController, outputFolder, false);
          
             List<int> usedMaterialIndices = meshProcessor.GetUsedMaterialIndices(sceneData);
           
-            List<FAFMaterial_t> usedMaterials = usedMaterialIndices
+            List<FAFMaterial_t> usedMaterials = [.. usedMaterialIndices
                 .Where(idx => rdbMesh.Members[idx] is FAFMaterial_t)
-                .Select(idx => (FAFMaterial_t)rdbMesh.Members[idx])
-                .ToList();
-           
-            materialBuilder.BuildMaterials(usedMaterials);
-            ConvertAndResolveMaterials(sceneData, materialBuilder);
+                .Select(idx => (FAFMaterial_t)rdbMesh.Members[idx])];
+
+            materialBuilder.BuildMaterials(rdbMesh, usedMaterials);
+            ConvertAndResolveMaterials(sceneData, rdbMesh, materialBuilder);
 
             Gltf gltf = GltfBuilder.Create(sceneData, out byte[] bufferData);
 
@@ -85,15 +84,15 @@ namespace aogltf
             SceneData sceneData = sceneBuilder.BuildSceneHierarchy();
             meshProcessor.ProcessMeshData(sceneData);
 
-            var materialBuilder = new AbiffMaterialBuilder(_rdbController, rdbMesh, outputFolder, true);
+            var materialBuilder = new AbiffMaterialBuilder(_rdbController, outputFolder, true);
             var usedMaterialIndices = meshProcessor.GetUsedMaterialIndices(sceneData);
             var usedMaterials = usedMaterialIndices
                 .Where(idx => rdbMesh.Members[idx] is FAFMaterial_t)
                 .Select(idx => (FAFMaterial_t)rdbMesh.Members[idx])
                 .ToList();
 
-            materialBuilder.BuildMaterials(usedMaterials);
-            ConvertAndResolveMaterials(sceneData, materialBuilder);
+            materialBuilder.BuildMaterials(rdbMesh, usedMaterials);
+            ConvertAndResolveMaterials(sceneData, rdbMesh, materialBuilder);
 
             Gltf gltf = GltfBuilder.Create(sceneData, out byte[] bufferData);
             materialBuilder.AddToGltf(gltf);
@@ -102,7 +101,7 @@ namespace aogltf
             return true;
         }
 
-        private void ConvertAndResolveMaterials(SceneData sceneData, AbiffMaterialBuilder materialBuilder)
+        private void ConvertAndResolveMaterials(SceneData sceneData, RDBMesh_t rdbMesh, AbiffMaterialBuilder materialBuilder)
         {
             var materialMap = new Dictionary<int, int>();
 
@@ -121,7 +120,7 @@ namespace aogltf
                         continue;
                     }
 
-                    int? resolvedGltfMatIndex = materialBuilder.ResolveMaterialIndex(rdbMatIndex);
+                    int? resolvedGltfMatIndex = materialBuilder.ResolveMaterialIndex(rdbMatIndex, rdbMesh);
 
                     if (resolvedGltfMatIndex.HasValue)
                     {
