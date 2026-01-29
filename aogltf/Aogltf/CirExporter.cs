@@ -107,7 +107,7 @@ namespace aogltf
 
         private static string GetCatMeshName(RdbController rdbController, int id)
         {
-            return (rdbController.Get<InfoObject>(1).Types[ResourceTypeId.CatMesh].TryGetValue(id, out string? rdbName)               ? rdbName.Trim('\0')   : $"Unnamed_{id}").Replace(".cir", "");
+            return (rdbController.Get<InfoObject>(1).Types[ResourceTypeId.CatMesh].TryGetValue(id, out string? rdbName) ? rdbName.Trim('\0') : $"Unnamed_{id}").Replace(".cir", "");
         }
 
         private static string GetCatAnimName(RdbController rdbController, int id)
