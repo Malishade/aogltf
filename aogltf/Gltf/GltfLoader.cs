@@ -1,7 +1,7 @@
 ﻿using System.Text;
 using System.Text.Json;
 
-namespace aogltf
+namespace gltf
 {
     public class GltfLoader
     {

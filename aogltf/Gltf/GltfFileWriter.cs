@@ -1,6 +1,6 @@
 ﻿using System.Text.Json;
 
-namespace aogltf
+namespace gltf
 {
     internal class GltfFileWriter
     {

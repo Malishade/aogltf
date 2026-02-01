@@ -1,4 +1,5 @@
-﻿using System.Numerics;
+﻿using gltf;
+using System.Numerics;
 
 namespace aogltf
 {

@@ -1,5 +1,6 @@
 ﻿using AODB;
 using AODB.Common.RDBObjects;
+using gltf;
 
 namespace aogltf
 {
@@ -44,8 +45,8 @@ namespace aogltf
                 materialBuilder.BuildMaterials(catMesh);
                 ConvertAndResolveMaterials(sceneData, catMesh, materialBuilder);
 
-                var gltf = GltfBuilder.Create(sceneData, out byte[] bufferData);
-                materialBuilder.AddToGltf(gltf);
+                var gltf = AOGltfBuilder.Create(sceneData, out byte[] bufferData);
+                gltf.BindMaterials(materialBuilder);
 
                 if (isGlb)
                 {

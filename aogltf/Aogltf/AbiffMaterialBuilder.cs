@@ -1,5 +1,6 @@
 ﻿using AODB;
 using AODB.Common.DbClasses;
+using gltf;
 using static AODB.Common.DbClasses.RDBMesh_t;
 
 namespace aogltf
@@ -43,13 +44,13 @@ namespace aogltf
             if (!rdbMaterialIndex.HasValue || rdbMaterialIndex.Value < 0)
                 return null;
 
-            if (_materialIndexMap.TryGetValue(rdbMaterialIndex.Value, out int gltfIndex))
+            if (MaterialIndexMap.TryGetValue(rdbMaterialIndex.Value, out int gltfIndex))
                 return gltfIndex;
 
             if (rdbMesh.Members[rdbMaterialIndex.Value] is FAFMaterial_t mat)
             {
                 int newIndex = BuildMaterial(mat, rdbMesh);
-                _materialIndexMap[rdbMaterialIndex.Value] = newIndex;
+                MaterialIndexMap[rdbMaterialIndex.Value] = newIndex;
                 return newIndex;
             }
 

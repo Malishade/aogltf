@@ -1,6 +1,6 @@
 ﻿using System.Text.Json.Serialization;
 
-namespace aogltf
+namespace gltf
 {
     public static class GltfConstants
     {
@@ -17,6 +17,14 @@ namespace aogltf
         // File structure sizes
         public const int GLTF_HEADER_SIZE = 12; // magic + version + length
         public const int CHUNK_HEADER_SIZE = 8; // length + type
+
+        //File write
+        public const int ARRAY_BUFFER = 34962;
+        public const int ELEMENT_ARRAY_BUFFER = 34963;
+        public const int FLOAT = 5126;
+        public const int UNSIGNED_SHORT = 5123;
+        public const int UNSIGNED_BYTE = 5121;
+        public const int TRIANGLES = 4;
     }
 
     public class Gltf

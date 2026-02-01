@@ -1,19 +1,11 @@
 ﻿using System.Numerics;
+using gltf;
+using Buffer = gltf.Buffer;
 
 namespace aogltf
 {
-    internal class GltfBuilder
+    internal class AOGltfBuilder
     {
-        private static class Constants
-        {
-            public const int ARRAY_BUFFER = 34962;
-            public const int ELEMENT_ARRAY_BUFFER = 34963;
-            public const int FLOAT = 5126;
-            public const int UNSIGNED_SHORT = 5123;
-            public const int UNSIGNED_BYTE = 5121;
-            public const int TRIANGLES = 4;
-        }
-
         public static Gltf Create(SceneData sceneData, out byte[] bufferData)
         {
             var bufferResult = BinaryBufferBuilder.CreateBuffer(sceneData.Meshes.ToArray(), sceneData.Animations.ToArray(), sceneData.Skins.ToArray());
@@ -276,7 +268,7 @@ namespace aogltf
                     {
                         Attributes = attributes,
                         Indices = indicesAccessor,
-                        Mode = Constants.TRIANGLES,
+                        Mode = GltfConstants.TRIANGLES,
                         Material = prim.MaterialIndex
                     };
                 }
@@ -306,7 +298,7 @@ namespace aogltf
                         Buffer = 0,
                         ByteOffset = primLayout.VertexSection.Offset,
                         ByteLength = primLayout.VertexSection.Length,
-                        Target = Constants.ARRAY_BUFFER
+                        Target = GltfConstants.ARRAY_BUFFER
                     });
 
                     if (primLayout.NormalSection.Length > 0)
@@ -315,7 +307,7 @@ namespace aogltf
                             Buffer = 0,
                             ByteOffset = primLayout.NormalSection.Offset,
                             ByteLength = primLayout.NormalSection.Length,
-                            Target = Constants.ARRAY_BUFFER
+                            Target = GltfConstants.ARRAY_BUFFER
                         });
 
                     if (primLayout.UVSection.Length > 0)
@@ -324,7 +316,7 @@ namespace aogltf
                             Buffer = 0,
                             ByteOffset = primLayout.UVSection.Offset,
                             ByteLength = primLayout.UVSection.Length,
-                            Target = Constants.ARRAY_BUFFER
+                            Target = GltfConstants.ARRAY_BUFFER
                         });
 
                     // Add skeletal mesh buffer views
@@ -334,7 +326,7 @@ namespace aogltf
                             Buffer = 0,
                             ByteOffset = primLayout.JointSection.Offset,
                             ByteLength = primLayout.JointSection.Length,
-                            Target = Constants.ARRAY_BUFFER
+                            Target = GltfConstants.ARRAY_BUFFER
                         });
 
                     if (primLayout.WeightSection.Length > 0)
@@ -343,7 +335,7 @@ namespace aogltf
                             Buffer = 0,
                             ByteOffset = primLayout.WeightSection.Offset,
                             ByteLength = primLayout.WeightSection.Length,
-                            Target = Constants.ARRAY_BUFFER
+                            Target = GltfConstants.ARRAY_BUFFER
                         });
 
                     views.Add(new BufferView
@@ -351,7 +343,7 @@ namespace aogltf
                         Buffer = 0,
                         ByteOffset = primLayout.IndexSection.Offset,
                         ByteLength = primLayout.IndexSection.Length,
-                        Target = Constants.ELEMENT_ARRAY_BUFFER
+                        Target = GltfConstants.ELEMENT_ARRAY_BUFFER
                     });
                 }
             }
@@ -366,7 +358,7 @@ namespace aogltf
                         Buffer = 0,
                         ByteOffset = channelLayout.TimeSection.Offset,
                         ByteLength = channelLayout.TimeSection.Length,
-                        Target = Constants.ARRAY_BUFFER
+                        Target = GltfConstants.ARRAY_BUFFER
                     });
 
                     views.Add(new BufferView
@@ -374,7 +366,7 @@ namespace aogltf
                         Buffer = 0,
                         ByteOffset = channelLayout.ValueSection.Offset,
                         ByteLength = channelLayout.ValueSection.Length,
-                        Target = Constants.ARRAY_BUFFER
+                        Target = GltfConstants.ARRAY_BUFFER
                     });
                 }
             }
@@ -387,7 +379,7 @@ namespace aogltf
                     Buffer = 0,
                     ByteOffset = skinLayout.InverseBindMatricesSection.Offset,
                     ByteLength = skinLayout.InverseBindMatricesSection.Length,
-                    Target = Constants.ARRAY_BUFFER
+                    Target = GltfConstants.ARRAY_BUFFER
                 });
             }
 
@@ -409,7 +401,7 @@ namespace aogltf
                     {
                         BufferView = bufferViewIndex++,
                         ByteOffset = 0,
-                        ComponentType = Constants.FLOAT,
+                        ComponentType = GltfConstants.FLOAT,
                         Count = prim.Vertices.Length,
                         Type = "VEC3",
                         Min = [prim.Bounds.Min.X, prim.Bounds.Min.Y, prim.Bounds.Min.Z],
@@ -422,7 +414,7 @@ namespace aogltf
                         {
                             BufferView = bufferViewIndex++,
                             ByteOffset = 0,
-                            ComponentType = Constants.FLOAT,
+                            ComponentType = GltfConstants.FLOAT,
                             Count = prim.Normals.Length,
                             Type = "VEC3"
                         });
@@ -433,7 +425,7 @@ namespace aogltf
                         {
                             BufferView = bufferViewIndex++,
                             ByteOffset = 0,
-                            ComponentType = Constants.FLOAT,
+                            ComponentType = GltfConstants.FLOAT,
                             Count = prim.UVs.Length,
                             Type = "VEC2"
                         });
@@ -447,7 +439,7 @@ namespace aogltf
                             {
                                 BufferView = bufferViewIndex++,
                                 ByteOffset = 0,
-                                ComponentType = Constants.UNSIGNED_SHORT,
+                                ComponentType = GltfConstants.UNSIGNED_SHORT,
                                 Count = skeletal.Joints.Length,
                                 Type = "VEC4"
                             });
@@ -458,7 +450,7 @@ namespace aogltf
                             {
                                 BufferView = bufferViewIndex++,
                                 ByteOffset = 0,
-                                ComponentType = Constants.FLOAT,
+                                ComponentType = GltfConstants.FLOAT,
                                 Count = skeletal.Weights.Length,
                                 Type = "VEC4"
                             });
@@ -469,7 +461,7 @@ namespace aogltf
                     {
                         BufferView = bufferViewIndex++,
                         ByteOffset = 0,
-                        ComponentType = Constants.UNSIGNED_SHORT,
+                        ComponentType = GltfConstants.UNSIGNED_SHORT,
                         Count = prim.Indices.Length,
                         Type = "SCALAR"
                     });
@@ -489,7 +481,7 @@ namespace aogltf
                     {
                         BufferView = bufferViewIndex++,
                         ByteOffset = 0,
-                        ComponentType = Constants.FLOAT,
+                        ComponentType = GltfConstants.FLOAT,
                         Count = channelData.Keyframes.Count,
                         Type = "SCALAR",
                         Min = [channelData.Keyframes.Min(k => k.Time)],
@@ -509,7 +501,7 @@ namespace aogltf
                     {
                         BufferView = bufferViewIndex++,
                         ByteOffset = 0,
-                        ComponentType = Constants.FLOAT,
+                        ComponentType = GltfConstants.FLOAT,
                         Count = channelData.Keyframes.Count,
                         Type = accessorType
                     });
@@ -523,7 +515,7 @@ namespace aogltf
                 {
                     BufferView = bufferViewIndex++,
                     ByteOffset = 0,
-                    ComponentType = Constants.FLOAT,
+                    ComponentType = GltfConstants.FLOAT,
                     Count = skinData.InverseBindMatrices.Length,
                     Type = "MAT4"
                 });

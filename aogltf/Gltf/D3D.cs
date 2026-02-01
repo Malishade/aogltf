@@ -1,4 +1,4 @@
-﻿namespace aogltf
+﻿namespace gltf
 {
     public enum TextureChannelType
     {

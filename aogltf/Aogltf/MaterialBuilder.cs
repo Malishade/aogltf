@@ -2,21 +2,25 @@
 using AODB.Common.RDBObjects;
 using AODB.Common.Structs;
 #nullable disable
+using gltf;
+using Image = gltf.Image;
 
 namespace aogltf
 {
     public abstract class MaterialBuilder(RdbController rdbController, string outputPath, bool isGlb)
     {
+        public readonly List<Image> Images = new();
+        public readonly List<Texture> Textures = new();
+        public readonly List<Material> Materials = new();
+        public readonly List<Sampler> Samplers = new List<Sampler> { new Sampler() };
+
+        protected readonly Dictionary<int, int> MaterialIndexMap = new();
+        protected int MaterialCount => Materials.Count;
+
         private readonly RdbController _rdbController = rdbController;
         private readonly string _outputPath = outputPath;
         private readonly bool _isGlb = isGlb;
         private readonly Dictionary<int, int> _textureIdMap = new();
-        private readonly List<Image> _images = new();
-        private readonly List<Texture> _textures = new();
-        protected readonly List<Material> _materials = new();
-        private readonly List<Sampler> _samplers = new List<Sampler> { new Sampler() };
-        protected readonly Dictionary<int, int> _materialIndexMap = new();
-        protected int MaterialCount => _materials.Count;
 
         protected static string GetMimeType(string fileName)
         {
@@ -55,23 +59,23 @@ namespace aogltf
                 image.Uri = Path.GetFileName(path);
                 image.MimeType = GetMimeType(name);
             }
-            int imageIndex = _images.Count;
-            _images.Add(image);
+            int imageIndex = Images.Count;
+            Images.Add(image);
             var texture = new Texture
             {
                 Name = $"texture_{textureId}",
                 Source = imageIndex,
                 Sampler = 0
             };
-            int texIndex = _textures.Count;
-            _textures.Add(texture);
+            int texIndex = Textures.Count;
+            Textures.Add(texture);
             _textureIdMap[textureId] = texIndex;
             return texIndex;
         }
 
         public Material GetMaterial(int index)
         {
-            return index >= 0 && index < _materials.Count ? _materials[index] : null;
+            return index >= 0 && index < Materials.Count ? Materials[index] : null;
         }
 
         protected Material CreateBasicMaterial(string name)
@@ -127,16 +131,9 @@ namespace aogltf
 
         protected int AddMaterialToList(Material material)
         {
-            int index = _materials.Count;
-            _materials.Add(material);
+            int index = Materials.Count;
+            Materials.Add(material);
             return index;
-        }
-        public void AddToGltf(Gltf gltf)
-        {
-            if (_materials.Count > 0) gltf.Materials = [.. _materials];
-            if (_textures.Count > 0) gltf.Textures = [.. _textures];
-            if (_images.Count > 0) gltf.Images = [.. _images];
-            if (_samplers.Count > 0) gltf.Samplers = [.. _samplers];
         }
     }
 }

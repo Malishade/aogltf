@@ -1,6 +1,7 @@
 ﻿using AODB;
 using AODB.Common.DbClasses;
 using AODB.Common.RDBObjects;
+using gltf;
 using static AODB.Common.DbClasses.RDBMesh_t;
 
 namespace aogltf
@@ -48,9 +49,8 @@ namespace aogltf
             materialBuilder.BuildMaterials(rdbMesh, usedMaterials);
             ConvertAndResolveMaterials(sceneData, rdbMesh, materialBuilder);
 
-            Gltf gltf = GltfBuilder.Create(sceneData, out byte[] bufferData);
-
-            materialBuilder.AddToGltf(gltf);
+            Gltf gltf = AOGltfBuilder.Create(sceneData, out byte[] bufferData);
+            gltf.BindMaterials(materialBuilder);
             gltf.Buffers[0].Uri = $"{objectName}.bin";
          
             var binPath = Path.Combine(outputFolder, $"{objectName}.bin");
@@ -95,8 +95,8 @@ namespace aogltf
             materialBuilder.BuildMaterials(rdbMesh, usedMaterials);
             ConvertAndResolveMaterials(sceneData, rdbMesh, materialBuilder);
 
-            Gltf gltf = GltfBuilder.Create(sceneData, out byte[] bufferData);
-            materialBuilder.AddToGltf(gltf);
+            Gltf gltf = AOGltfBuilder.Create(sceneData, out byte[] bufferData);
+            gltf.BindMaterials(materialBuilder);
 
             GltfFileWriter.WriteToFile(Path.Combine(outputFolder, $"{objectName}.glb"), gltf, bufferData);
             return true;
