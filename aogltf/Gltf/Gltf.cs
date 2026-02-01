@@ -2,6 +2,23 @@
 
 namespace aogltf
 {
+    public static class GltfConstants
+    {
+        // GLTF file format constants
+        public const uint GLTF_MAGIC = 0x46546C67; // "glTF"
+        public const int GLTF_VERSION = 2;
+        public const uint JSON_CHUNK_TYPE = 0x4E4F534A; // "JSON"
+        public const uint BIN_CHUNK_TYPE = 0x004E4942;  // "BIN\0"
+
+        // Padding constants
+        public const byte JSON_PADDING_BYTE = 0x20; // Space character
+        public const byte BIN_PADDING_BYTE = 0x00;  // Null byte
+
+        // File structure sizes
+        public const int GLTF_HEADER_SIZE = 12; // magic + version + length
+        public const int CHUNK_HEADER_SIZE = 8; // length + type
+    }
+
     public class Gltf
     {
         [JsonPropertyName("asset")]

@@ -45,7 +45,7 @@ internal class Program
                 {
                     return (false, $"Directory exists but ResourceDatabase.dat not found");
                 }
-                
+
                 Console.ForegroundColor = ConsoleColor.Green;
                 Console.ResetColor();
                 return (true, "Success");
@@ -61,8 +61,8 @@ internal class Program
             .Create()
             .WithTitle(_title)
             .WithPrompt("Export path:")
-            .WithDefaultValue(string.IsNullOrEmpty(config.ExportPath) ? 
-                Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.Desktop), "AOExport") : 
+            .WithDefaultValue(string.IsNullOrEmpty(config.ExportPath) ?
+                Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.Desktop), "AOExport") :
                 config.ExportPath)
             .WithValidator(path =>
             {
@@ -73,7 +73,7 @@ internal class Program
                 {
                     var fullPath = Path.GetFullPath(path);
                     var root = Path.GetPathRoot(fullPath);
-                    
+
                     if (string.IsNullOrEmpty(root) || !Directory.Exists(root))
                         return (false, $"Drive does not exist: {root}");
 
@@ -174,13 +174,16 @@ internal class Program
             ? AODB.Common.RDBObjects.ResourceTypeId.CatMesh
             : AODB.Common.RDBObjects.ResourceTypeId.RdbMesh;
 
+        var width = 80;
         ConsoleSelectionMenu
             .Create<KeyValuePair<int, string>>()
+            .WithBorderWidth(width)
             .WithItems(names[resourceType])
             .WithDynamicHeight()
             .WithShowInfo()
             .WithTitle(isCir ? "Cir Browser" : "Abiff Browser")
-            .WithDisplayFunc(kvp => $"{kvp.Key} - {kvp.Value}")
+            .WithHeaders([new Header("ID", 0.15f), new Header("Name", 0.85f)])
+            .WithDisplayFunc(kvp => $"{kvp.Key.ToString().PadRight((int)(width * 0.15f - 1))} {kvp.Value}")
             .WithFilterFunc((search, kvp) =>
                 kvp.Value.Contains(search, StringComparison.OrdinalIgnoreCase) ||
                 kvp.Key.ToString().Contains(search))
