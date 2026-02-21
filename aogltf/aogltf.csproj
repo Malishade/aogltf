@@ -9,9 +9,7 @@
   <ItemGroup>
     <Reference Include="Lib\AODB.dll" />
     <Reference Include="Lib\AODB.Common.dll" />
-    <Reference Include="Lib\ConsoleUI.dll" />
-	<PackageReference Include="System.Text.Encoding.CodePages" Version="8.0.0" />
-    <PackageReference Include="System.Drawing.Common" Version="8.0.0" />	
+    <Reference Include="Lib\ConsoleUI.dll" />	
   </ItemGroup>
   <ItemGroup>
     <None Update="Aogltf\CatMeshToAnimId.bin">
