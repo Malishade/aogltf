@@ -19,6 +19,12 @@ internal class Program
 
     static void Main(string[] args)
     {
+        LoadUI();
+    }
+
+
+    private static void LoadUI()
+    {        
         Console.WindowHeight = 40;
         Console.ForegroundColor = ConsoleColor.Yellow;
         Console.CursorVisible = false;
@@ -134,7 +140,6 @@ internal class Program
         Console.WriteLine("Exiting...");
         Console.ResetColor();
     }
-
     private static void HandleNameDump(RdbController rdbController, string exportDir)
     {
         var names = rdbController.GetNames();
@@ -143,7 +148,7 @@ internal class Program
             .Create(_title, $"Exporting abiff / cir names ...")
             .WithSuccessMessage(objectName => $"Names exported to : {exportDir}")
             .WithErrorMessage(error => $"Failed to export names: {error}")
-            .Show(() => 
+            .Show(() =>
             {
                 bool success = SaveNameJson(names[AODB.Common.RDBObjects.ResourceTypeId.CatMesh], exportDir, "CirNames") &&
                 SaveNameJson(names[AODB.Common.RDBObjects.ResourceTypeId.RdbMesh], exportDir, "AbiffNames");
@@ -151,7 +156,7 @@ internal class Program
             });
     }
 
-    private static bool SaveNameJson(Dictionary<int,string> names, string exportDir, string fileName)
+    private static bool SaveNameJson(Dictionary<int, string> names, string exportDir, string fileName)
     {
         try
         {
@@ -211,7 +216,7 @@ internal class Program
                             .Create(_title, $"Exporting model {modelId}...")
                             .WithSuccessMessage(objectName => $"Model exported to: {exportDir}\\{objectName}.{fileFormat.ToString().ToLower()}")
                             .WithErrorMessage(error => $"Failed to export model {modelId}: {error}")
-                            .Show(() => 
+                            .Show(() =>
                             {
                                 bool success = isCir
                                     ? new CirExporter(rdbController).Export(exportDir, modelId, fileFormat, out string objectName)
@@ -224,4 +229,23 @@ internal class Program
             })
             .Show();
     }
+
+    //private static void PlayfieldTest()
+    //{
+    //    var rdbController = new RdbController($"D:\\Funcom\\Anarchy Online");
+    //    var pfId = 4582;
+    //    new PlayfieldExporter(rdbController).Export(pfId, $"D:\\AOExport", FileFormat.Glb);
+    //    Console.WriteLine("Done");
+    //    Console.ReadLine();
+    //}
+
+    //private static void ImportTest()
+    //{
+    //    AbiffImporter.Import(new ImportOptions
+    //    {
+    //        AOPath = $"D:\\Funcom\\Anarchy Online",
+    //        ModelPath = $"D:\\AOExport\\cube.gltf",
+    //        RecordId = 118168
+    //    });
+    //}
 }

@@ -83,7 +83,6 @@ namespace aogltf
                 }
             }
 
-            // Process texture channels
             for (int i = 0; i < deltaState.tch_count; i++)
             {
                 if (rdbMesh.Members[deltaState.tch_text[i]] is FAFTexture_t tex &&

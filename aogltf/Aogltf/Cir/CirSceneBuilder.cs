@@ -50,7 +50,6 @@ namespace aogltf
                     HasAnimation = _animData != null && _animData.Count > 0
                 };
 
-                // Set initial transform from first animation frame if available
                 if (_animData != null && _animData.Count > 0)
                 {
                     var firstAnim = _animData[0];
