@@ -196,7 +196,7 @@ namespace aogltf
 
             var uvs = Array.Empty<Vector2>();
             if (pfMesh.UV != null && pfMesh.UV.Count > 0)
-                uvs = pfMesh.UV.Select(uv => new Vector2(uv.X, uv.Y)).ToArray();
+                uvs = pfMesh.UV.Select(uv => new Vector2(uv.X, -uv.Y)).ToArray();
 
             var indices = Array.Empty<ushort>();
             if (pfMesh.Triangles != null && pfMesh.Triangles.Count > 0)
