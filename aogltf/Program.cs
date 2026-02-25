@@ -20,9 +20,9 @@ internal enum ExportOptionSetting
     GamePath,
     ExportPath,
     FileFormat,
-    FlipX,
-    FlipY,
-    FlipZ,
+    MirrorX,
+    MirrorY,
+    MirrorZ,
     Back
 }
 
@@ -160,9 +160,9 @@ internal class Program
                 ExportOptionSetting.GamePath => $"Game Path      [{(string.IsNullOrEmpty(config.AoPath) ? "NOT SET" : config.AoPath)}]",
                 ExportOptionSetting.ExportPath => $"Export Path    [{(string.IsNullOrEmpty(config.ExportPath) ? "NOT SET" : config.ExportPath)}]",
                 ExportOptionSetting.FileFormat => $"File Format    [{config.FileFormat}]",
-                ExportOptionSetting.FlipX => $"Flip X         [{(config.ExportTransforms.HasFlag(ExportMirror.MirrorX) ? "ON" : "OFF")}]",
-                ExportOptionSetting.FlipY => $"Flip Y         [{(config.ExportTransforms.HasFlag(ExportMirror.MirrorY) ? "ON" : "OFF")}]",
-                ExportOptionSetting.FlipZ => $"Flip Z         [{(config.ExportTransforms.HasFlag(ExportMirror.MirrorZ) ? "ON" : "OFF")}]",
+                ExportOptionSetting.MirrorX => $"Mirror X         [{(config.ExportTransforms.HasFlag(ExportMirror.MirrorX) ? "ON" : "OFF")}]",
+                ExportOptionSetting.MirrorY => $"Mirror Y         [{(config.ExportTransforms.HasFlag(ExportMirror.MirrorY) ? "ON" : "OFF")}]",
+                ExportOptionSetting.MirrorZ => $"Mirror Z         [{(config.ExportTransforms.HasFlag(ExportMirror.MirrorZ) ? "ON" : "OFF")}]",
                 ExportOptionSetting.Back => "Back",
                 _ => opt.ToString()
             })
@@ -240,17 +240,17 @@ internal class Program
                         config.SaveConfig(configPath);
                         return true;
 
-                    case ExportOptionSetting.FlipX:
+                    case ExportOptionSetting.MirrorX:
                         config.ExportTransforms ^= ExportMirror.MirrorX;
                         config.SaveConfig(configPath);
                         return true;
 
-                    case ExportOptionSetting.FlipY:
+                    case ExportOptionSetting.MirrorY:
                         config.ExportTransforms ^= ExportMirror.MirrorY;
                         config.SaveConfig(configPath);
                         return true;
 
-                    case ExportOptionSetting.FlipZ:
+                    case ExportOptionSetting.MirrorZ:
                         config.ExportTransforms ^= ExportMirror.MirrorZ;
                         config.SaveConfig(configPath);
                         return true;
