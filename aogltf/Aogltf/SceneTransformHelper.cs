@@ -15,9 +15,28 @@ namespace aogltf
     {
         public static void Apply(SceneData sceneData, ExportMirror transforms)
         {
-            if (transforms.HasFlag(ExportMirror.MirrorX)) ApplyAxisMirror(sceneData, x: true, y: false, z: false);
-            if (transforms.HasFlag(ExportMirror.MirrorY)) ApplyAxisMirror(sceneData, x: false, y: true, z: false);
-            if (transforms.HasFlag(ExportMirror.MirrorZ)) ApplyAxisMirror(sceneData, x: false, y: false, z: true);
+            if (transforms.HasFlag(ExportMirror.MirrorX)) ApplyAxisMirror(sceneData, true, false, false);
+            if (transforms.HasFlag(ExportMirror.MirrorY)) ApplyAxisMirror(sceneData, false, true, false);
+            if (transforms.HasFlag(ExportMirror.MirrorZ)) ApplyAxisMirror(sceneData, false, false, true);
+        }
+
+        public static void MirrorUV(SceneData sceneData, bool flipU, bool flipV)
+        {
+            if (!flipU && !flipV)
+                return;
+
+            foreach (var mesh in sceneData.Meshes)
+            {
+                foreach (var prim in mesh.Primitives)
+                {
+                    for (int i = 0; i < prim.UVs.Length; i++)
+                    {
+                        float u = flipU ? 1f - prim.UVs[i].X : prim.UVs[i].X;
+                        float v = flipV ? 1f - prim.UVs[i].Y : prim.UVs[i].Y;
+                        prim.UVs[i] = new Vector2(u, v);
+                    }
+                }
+            }
         }
 
         private static void ApplyAxisMirror(SceneData sceneData, bool x, bool y, bool z)

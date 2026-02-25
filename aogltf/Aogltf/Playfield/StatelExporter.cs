@@ -62,7 +62,7 @@ namespace aogltf
                 var sceneBuilder = new StatelSceneBuilder();
                 SceneData sceneData = sceneBuilder.BuildStatelScene(statelData);
 
-                SceneTransformHelper.Apply(sceneData, ExportTransforms);
+                ApplySceneTransform(sceneData);
 
                 var materialBuilder = new StatelMaterialBuilder(_rdbController, outputFolder, true);
                 materialBuilder.BuildMaterialsFromStatelData(statelData);
@@ -96,7 +96,7 @@ namespace aogltf
                 var sceneBuilder = new StatelSceneBuilder();
                 SceneData sceneData = sceneBuilder.BuildStatelScene(pfStatelData);
 
-                SceneTransformHelper.Apply(sceneData, ExportTransforms);
+                ApplySceneTransform(sceneData);
 
                 var materialBuilder = new StatelMaterialBuilder(_rdbController, outputFolder, false);
                 materialBuilder.BuildMaterialsFromStatelData(pfStatelData);
@@ -117,6 +117,13 @@ namespace aogltf
             {
                 return false;
             }
+        }
+
+        public void ApplySceneTransform(SceneData sceneData)
+        {
+            SceneTransformHelper.Apply(sceneData, ExportMirror.MirrorX);
+            SceneTransformHelper.MirrorUV(sceneData, false, true);
+            SceneTransformHelper.Apply(sceneData, ExportTransforms);
         }
     }
 
@@ -196,7 +203,7 @@ namespace aogltf
 
             var uvs = Array.Empty<Vector2>();
             if (pfMesh.UV != null && pfMesh.UV.Count > 0)
-                uvs = pfMesh.UV.Select(uv => new Vector2(uv.X, -uv.Y)).ToArray();
+                uvs = pfMesh.UV.Select(uv => new Vector2(uv.X, uv.Y)).ToArray();
 
             var indices = Array.Empty<ushort>();
             if (pfMesh.Triangles != null && pfMesh.Triangles.Count > 0)

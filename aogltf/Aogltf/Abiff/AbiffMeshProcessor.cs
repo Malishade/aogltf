@@ -43,20 +43,19 @@ namespace aogltf
                     continue;
 
                 Vector3[] vertices;
+                Vector3[] normals;
 
                 if (!hasAnimation)
                 {
                     Matrix4x4 transform = CreateTransformMatrix(triMeshData);
                     vertices = [.. simpleMesh.Vertices.Select(v => transform.MultiplyPoint(v.Position.ToNumerics()))];
+                    normals = [.. simpleMesh.Vertices.Select(v => Vector3.TransformNormal(v.Normal.ToNumerics(), transform))];
                 }
                 else
                 {
                     vertices = [.. simpleMesh.Vertices.Select(v => v.Position.ToNumerics())];
+                    normals = [.. simpleMesh.Vertices.Select(v => v.Normal.ToNumerics())];
                 }
-
-                var normals = simpleMesh.Vertices
-                    .Select(v => v.Normal.ToNumerics())
-                    .ToArray();
 
                 var uvs = simpleMesh.Vertices
                     .Select(v => new Vector2(v.UVs.X, v.UVs.Y))

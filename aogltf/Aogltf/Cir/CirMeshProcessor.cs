@@ -172,7 +172,7 @@ namespace aogltf
                 GetVertexBindPose(vertex, out Vector3 vertexPosition, out Vector3 vertexNormal);
                 vertices.Add(vertexPosition);
                 normals.Add(vertexNormal);
-                uvs.Add(new Vector2(vertex.Uvs.X, 1.0f - vertex.Uvs.Y));
+                uvs.Add(new Vector2(vertex.Uvs.X, vertex.Uvs.Y));
 
                 if (_catMesh.Joints?.Count > 0)
                 {

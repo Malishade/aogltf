@@ -20,7 +20,7 @@ namespace aogltf
             var sceneBuilder = new TerrainSceneBuilder();
             SceneData sceneData = sceneBuilder.BuildTerrainScene(terrainData);
 
-            SceneTransformHelper.Apply(sceneData, ExportTransforms);
+            ApplySceneTransform(sceneData);
 
             Gltf gltf = AOGltfBuilder.Create(sceneData, out byte[] bufferData);
 
@@ -38,7 +38,7 @@ namespace aogltf
             var sceneBuilder = new TerrainSceneBuilder();
             SceneData sceneData = sceneBuilder.BuildTerrainScene(terrainData);
 
-            SceneTransformHelper.Apply(sceneData, ExportTransforms);
+            ApplySceneTransform(sceneData);
 
             Gltf gltf = AOGltfBuilder.Create(sceneData, out byte[] bufferData);
 
@@ -52,6 +52,12 @@ namespace aogltf
 
             GltfFileWriter.WriteToFile(Path.Combine(outputFolder, $"{objectName}.gltf"), gltf);
             return true;
+        }
+
+        public void ApplySceneTransform(SceneData sceneData)
+        {
+            SceneTransformHelper.Apply(sceneData, ExportMirror.MirrorX);
+            SceneTransformHelper.Apply(sceneData, ExportTransforms);
         }
 
         private void AddTerrainMaterial(Gltf gltf, PfTextureAtlas atlas, ref byte[] bufferData)

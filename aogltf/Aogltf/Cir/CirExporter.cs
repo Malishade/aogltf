@@ -41,7 +41,7 @@ namespace aogltf
                 SceneData sceneData = sceneBuilder.BuildSceneHierarchy(out var boneNodes);
                 meshProcessor.ProcessMeshData(sceneData, boneNodes);
 
-                SceneTransformHelper.Apply(sceneData, transform);
+                ApplySceneTransform(sceneData, transform);
 
                 var materialBuilder = new CirMaterialBuilder(_rdbController, outputFolder, isGlb);
                 materialBuilder.BuildMaterials(catMesh);
@@ -140,6 +140,13 @@ namespace aogltf
                 .ToList();
 
             return animData.Count != 0;
+        }
+
+        public void ApplySceneTransform(SceneData sceneData, ExportMirror transform)
+        {
+            SceneTransformHelper.MirrorUV(sceneData, false, true);
+            SceneTransformHelper.Apply(sceneData, ExportMirror.MirrorX);
+            SceneTransformHelper.Apply(sceneData, transform);
         }
     }
 }
