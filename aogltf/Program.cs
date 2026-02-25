@@ -157,13 +157,13 @@ internal class Program
             .WithTitle("Export Options")
             .WithDisplayFunc(opt => opt switch
             {
-                ExportOptionSetting.GamePath => $"Game Path      [{(string.IsNullOrEmpty(config.AoPath) ? "NOT SET" : config.AoPath)}]",
+                ExportOptionSetting.GamePath   => $"Game Path      [{(string.IsNullOrEmpty(config.AoPath) ? "NOT SET" : config.AoPath)}]",
                 ExportOptionSetting.ExportPath => $"Export Path    [{(string.IsNullOrEmpty(config.ExportPath) ? "NOT SET" : config.ExportPath)}]",
                 ExportOptionSetting.FileFormat => $"File Format    [{config.FileFormat}]",
-                ExportOptionSetting.MirrorX => $"Mirror X         [{(config.ExportTransforms.HasFlag(ExportMirror.MirrorX) ? "ON" : "OFF")}]",
-                ExportOptionSetting.MirrorY => $"Mirror Y         [{(config.ExportTransforms.HasFlag(ExportMirror.MirrorY) ? "ON" : "OFF")}]",
-                ExportOptionSetting.MirrorZ => $"Mirror Z         [{(config.ExportTransforms.HasFlag(ExportMirror.MirrorZ) ? "ON" : "OFF")}]",
-                ExportOptionSetting.Back => "Back",
+                ExportOptionSetting.MirrorX    => $"Mirror X       [{(config.ExportTransforms.HasFlag(ExportMirror.MirrorX) ? "ON" : "OFF")}]",
+                ExportOptionSetting.MirrorY    => $"Mirror Y       [{(config.ExportTransforms.HasFlag(ExportMirror.MirrorY) ? "ON" : "OFF")}]",
+                ExportOptionSetting.MirrorZ    => $"Mirror Z       [{(config.ExportTransforms.HasFlag(ExportMirror.MirrorZ) ? "ON" : "OFF")}]",
+                ExportOptionSetting.Back       => "Back",
                 _ => opt.ToString()
             })
             .OnSelect(setting =>
