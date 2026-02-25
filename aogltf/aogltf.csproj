@@ -9,6 +9,7 @@
   <ItemGroup>
     <Reference Include="Lib\AODB.dll" />
     <Reference Include="Lib\AODB.Common.dll" />
+    <PackageReference Include="System.Drawing.Common" Version="8.0.0" />	
     <Reference Include="Lib\ConsoleUI.dll" />	
   </ItemGroup>
   <ItemGroup>

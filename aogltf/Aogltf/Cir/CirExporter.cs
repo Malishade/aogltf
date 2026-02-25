@@ -22,7 +22,7 @@ namespace aogltf
             _catMeshToAnimIds = CatMeshToAnimIdSerializer.DeserializeCompressed(File.ReadAllBytes(path));
         }
 
-        public bool Export(string outputFolder, int meshId, FileFormat format, out string objectName)
+        public bool Export(string outputFolder, int meshId, FileFormat format, out string objectName, ExportMirror transform = ExportMirror.NoMirror)
         {
             objectName = string.Empty;
             bool isGlb = format == FileFormat.Glb;
@@ -40,6 +40,8 @@ namespace aogltf
 
                 SceneData sceneData = sceneBuilder.BuildSceneHierarchy(out var boneNodes);
                 meshProcessor.ProcessMeshData(sceneData, boneNodes);
+
+                SceneTransformHelper.Apply(sceneData, transform);
 
                 var materialBuilder = new CirMaterialBuilder(_rdbController, outputFolder, isGlb);
                 materialBuilder.BuildMaterials(catMesh);
@@ -108,12 +110,14 @@ namespace aogltf
 
         private static string GetCatMeshName(RdbController rdbController, int id)
         {
-            return (rdbController.Get<InfoObject>(1).Types[ResourceTypeId.CatMesh].TryGetValue(id, out string? rdbName) ? rdbName.Trim('\0') : $"Unnamed_{id}").Replace(".cir", "");
+            return (rdbController.Get<InfoObject>(1).Types[ResourceTypeId.CatMesh].TryGetValue(id, out string? rdbName)
+                ? rdbName.Trim('\0') : $"Unnamed_{id}").Replace(".cir", "");
         }
 
         private static string GetCatAnimName(RdbController rdbController, int id)
         {
-            return (rdbController.Get<InfoObject>(1).Types[ResourceTypeId.Anim].TryGetValue(id, out string? rdbName) ? rdbName.Trim('\0') : $"Unnamed_{id}").Replace(".ani", "");
+            return (rdbController.Get<InfoObject>(1).Types[ResourceTypeId.Anim].TryGetValue(id, out string? rdbName)
+                ? rdbName.Trim('\0') : $"Unnamed_{id}").Replace(".ani", "");
         }
 
         private bool GetAnimData(int meshId, out List<AnimData> animData)

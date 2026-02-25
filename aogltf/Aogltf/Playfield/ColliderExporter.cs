@@ -7,7 +7,6 @@ namespace aogltf
 {
     public class CollisionExporter : PlayfieldExporterBase<List<PfCollisionMeshData>>
     {
-
         public CollisionExporter(RdbController rdbController) : base(rdbController)
         {
         }
@@ -27,6 +26,8 @@ namespace aogltf
 
                 var sceneBuilder = new CollisionSceneBuilder();
                 SceneData sceneData = sceneBuilder.BuildCollisionScene(collisionData);
+
+                SceneTransformHelper.Apply(sceneData, ExportTransforms);
 
                 Gltf gltf = AOGltfBuilder.Create(sceneData, out byte[] bufferData);
 
@@ -50,6 +51,8 @@ namespace aogltf
 
                 var sceneBuilder = new CollisionSceneBuilder();
                 SceneData sceneData = sceneBuilder.BuildCollisionScene(collisionData);
+
+                SceneTransformHelper.Apply(sceneData, ExportTransforms);
 
                 Gltf gltf = AOGltfBuilder.Create(sceneData, out byte[] bufferData);
                 gltf.Buffers[0].Uri = $"{objectName}.bin";
@@ -102,18 +105,10 @@ namespace aogltf
         private NodeData CreateSubmeshNode(PfCollisionSubmesh submesh, uint surfaceId, int submeshIndex, SceneData sceneData)
         {
             var meshData = new MeshData();
-            var verts = submesh.Vertices.Select(v => new Vector3(v.X, v.Y, -v.Z)).ToArray();
+            var verts = submesh.Vertices.Select(v => new Vector3(v.X, v.Y, v.Z)).ToArray();
             var normals = Array.Empty<Vector3>();
             var uvs = Array.Empty<Vector2>();
-
-            // Convert indices - reverse winding order
-            var indices = new ushort[submesh.Triangles.Length];
-            for (int i = 0; i < submesh.Triangles.Length; i += 3)
-            {
-                indices[i] = (ushort)submesh.Triangles[i];
-                indices[i + 1] = (ushort)submesh.Triangles[i + 2];
-                indices[i + 2] = (ushort)submesh.Triangles[i + 1];
-            }
+            var indices = submesh.Triangles.Select(t => (ushort)t).ToArray();
 
             var primitive = new PrimitiveData(verts, normals, uvs, indices, null);
             meshData.Primitives.Add(primitive);

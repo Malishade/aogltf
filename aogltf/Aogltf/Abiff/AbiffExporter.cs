@@ -15,19 +15,20 @@ namespace aogltf
             _rdbController = rdbController;
         }
 
-        public bool Export(string outputFolder, int meshId, FileFormat format, out string objectName)
+        public bool Export(string outputFolder, int meshId, FileFormat format, out string objectName, ExportMirror transform = ExportMirror.NoMirror)
         {
             objectName = string.Empty;
 
             return format switch
             {
-                FileFormat.Gltf => ExportGltf(outputFolder, meshId, out objectName),
-                FileFormat.Glb => ExportGlb(outputFolder, meshId, out objectName),
+                FileFormat.Gltf => ExportGltf(outputFolder, meshId, out objectName, transform),
+                FileFormat.Glb => ExportGlb(outputFolder, meshId, out objectName, transform),
                 _ => false,
             };
         }
 
-        private bool ExportGltf(string outputFolder, int meshId, out string objectName)
+        private bool ExportGltf(string outputFolder, int meshId, out string objectName,
+            ExportMirror transform)
         {
             var rdbMesh = _rdbController.Get<RDBMesh>(meshId).RDBMesh_t;
             var sceneBuilder = new AbiffSceneBuilder(rdbMesh);
@@ -36,11 +37,11 @@ namespace aogltf
 
             SceneData sceneData = sceneBuilder.BuildSceneHierarchy();
             meshProcessor.ProcessMeshData(sceneData);
-          
+
+            SceneTransformHelper.Apply(sceneData, transform);
+
             var materialBuilder = new AbiffMaterialBuilder(_rdbController, outputFolder, false);
-         
             List<int> usedMaterialIndices = meshProcessor.GetUsedMaterialIndices(sceneData);
-          
             List<FAFMaterial_t> usedMaterials = usedMaterialIndices
                 .Where(idx => rdbMesh.Members[idx] is FAFMaterial_t)
                 .Select(idx => (FAFMaterial_t)rdbMesh.Members[idx])
@@ -52,16 +53,14 @@ namespace aogltf
             Gltf gltf = AOGltfBuilder.Create(sceneData, out byte[] bufferData);
             gltf.BindMaterials(materialBuilder);
             gltf.Buffers[0].Uri = $"{objectName}.bin";
-         
-            var binPath = Path.Combine(outputFolder, $"{objectName}.bin");
-        
-            File.WriteAllBytes(binPath, bufferData);
 
+            File.WriteAllBytes(Path.Combine(outputFolder, $"{objectName}.bin"), bufferData);
             GltfFileWriter.WriteToFile(Path.Combine(outputFolder, $"{objectName}.gltf"), gltf);
             return true;
         }
 
-        private bool ExportGlb(string outputFolder, int meshId, out string objectName)
+        private bool ExportGlb(string outputFolder, int meshId, out string objectName,
+            ExportMirror transform)
         {
             objectName = string.Empty;
             RDBMesh_t? rdbMesh;
@@ -84,6 +83,8 @@ namespace aogltf
 
             SceneData sceneData = sceneBuilder.BuildSceneHierarchy();
             meshProcessor.ProcessMeshData(sceneData);
+
+            SceneTransformHelper.Apply(sceneData, transform);
 
             var materialBuilder = new AbiffMaterialBuilder(_rdbController, outputFolder, true);
             var usedMaterialIndices = meshProcessor.GetUsedMaterialIndices(sceneData);
@@ -138,7 +139,8 @@ namespace aogltf
 
         private static string GetInfoObjectName(RdbController rdbController, int id)
         {
-            return (rdbController.Get<InfoObject>(1).Types[ResourceTypeId.RdbMesh].TryGetValue(id, out string? rdbName) ? rdbName.Trim('\0') : $"Unnamed_{id}").Replace(".abiff", "");
+            return (rdbController.Get<InfoObject>(1).Types[ResourceTypeId.RdbMesh].TryGetValue(id, out string? rdbName)
+                ? rdbName.Trim('\0') : $"Unnamed_{id}").Replace(".abiff", "");
         }
     }
 }

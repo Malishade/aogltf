@@ -1,4 +1,5 @@
 ﻿using System.Text.Json;
+using gltf;
 
 namespace aogltf;
 
@@ -6,6 +7,8 @@ internal class Config
 {
     public string? AoPath { get; set; }
     public string? ExportPath { get; set; }
+    public FileFormat FileFormat { get; set; } = FileFormat.Glb;
+    public ExportMirror ExportTransforms { get; set; } = ExportMirror.NoMirror;
 
     public static Config LoadConfig(string configPath)
     {
@@ -19,9 +22,7 @@ internal class Config
         }
         catch (Exception ex)
         {
-            Console.ForegroundColor = ConsoleColor.DarkRed;
             Console.WriteLine($"Could not load config: {ex.Message}");
-            Console.ResetColor();
         }
 
         return new Config();
@@ -39,9 +40,7 @@ internal class Config
         }
         catch (Exception ex)
         {
-            Console.ForegroundColor = ConsoleColor.DarkRed;
             Console.WriteLine($"Could not save config: {ex.Message}");
-            Console.ResetColor();
         }
     }
 }

@@ -20,15 +20,14 @@ namespace aogltf
             var sceneBuilder = new TerrainSceneBuilder();
             SceneData sceneData = sceneBuilder.BuildTerrainScene(terrainData);
 
+            SceneTransformHelper.Apply(sceneData, ExportTransforms);
+
             Gltf gltf = AOGltfBuilder.Create(sceneData, out byte[] bufferData);
 
             if (terrainData.Atlas != null)
-            {
                 AddTerrainMaterial(gltf, terrainData.Atlas, ref bufferData);
-            }
 
             GltfFileWriter.WriteToFile(Path.Combine(outputFolder, $"Playfield_Terrain_{PlayfieldId}.glb"), gltf, bufferData);
-
             return true;
         }
 
@@ -39,12 +38,12 @@ namespace aogltf
             var sceneBuilder = new TerrainSceneBuilder();
             SceneData sceneData = sceneBuilder.BuildTerrainScene(terrainData);
 
+            SceneTransformHelper.Apply(sceneData, ExportTransforms);
+
             Gltf gltf = AOGltfBuilder.Create(sceneData, out byte[] bufferData);
 
             if (terrainData.Atlas != null)
-            {
                 AddTerrainMaterial(gltf, terrainData.Atlas, ref bufferData);
-            }
 
             gltf.Buffers[0].Uri = $"{objectName}.bin";
 
@@ -52,7 +51,6 @@ namespace aogltf
             File.WriteAllBytes(binPath, bufferData);
 
             GltfFileWriter.WriteToFile(Path.Combine(outputFolder, $"{objectName}.gltf"), gltf);
-
             return true;
         }
 
@@ -129,12 +127,8 @@ namespace aogltf
             if (gltf.Meshes != null)
             {
                 foreach (var mesh in gltf.Meshes)
-                {
                     foreach (var primitive in mesh.Primitives)
-                    {
                         primitive.Material = 0;
-                    }
-                }
             }
         }
     }
@@ -167,17 +161,23 @@ namespace aogltf
         {
             var meshData = new MeshData();
 
-            var verts = chunk.Vertices.Select(v => new System.Numerics.Vector3(v.X, v.Y, -v.Z)).ToArray();
-            var normals = chunk.Normals.Select(n => new System.Numerics.Vector3(n.X, n.Y, -n.Z)).ToArray();
-            var uvs = chunk.UVs.Select(uv => new System.Numerics.Vector2(uv.X, uv.Y)).ToArray();
+            var mat = new System.Numerics.Matrix4x4(
+                chunk.Transform.values[0, 0], chunk.Transform.values[1, 0], chunk.Transform.values[2, 0], chunk.Transform.values[3, 0],
+                chunk.Transform.values[0, 1], chunk.Transform.values[1, 1], chunk.Transform.values[2, 1], chunk.Transform.values[3, 1],
+                chunk.Transform.values[0, 2], chunk.Transform.values[1, 2], chunk.Transform.values[2, 2], chunk.Transform.values[3, 2],
+                chunk.Transform.values[0, 3], chunk.Transform.values[1, 3], chunk.Transform.values[2, 3], chunk.Transform.values[3, 3]
+            );
 
-            var indices = new ushort[chunk.Triangles.Length];
-            for (int i = 0; i < chunk.Triangles.Length; i += 3)
-            {
-                indices[i] = (ushort)chunk.Triangles[i];
-                indices[i + 1] = (ushort)chunk.Triangles[i + 2];
-                indices[i + 2] = (ushort)chunk.Triangles[i + 1];
-            }
+            var verts = chunk.Vertices
+                .Select(v => System.Numerics.Vector3.Transform(new System.Numerics.Vector3(v.X, v.Y, v.Z), mat))
+                .ToArray();
+
+            var normals = chunk.Normals
+                .Select(n => System.Numerics.Vector3.TransformNormal(new System.Numerics.Vector3(n.X, n.Y, n.Z), mat))
+                .ToArray();
+
+            var uvs = chunk.UVs.Select(uv => new System.Numerics.Vector2(uv.X, uv.Y)).ToArray();
+            var indices = chunk.Triangles.Select(t => (ushort)t).ToArray();
 
             var primitive = new PrimitiveData(verts, normals, uvs, indices, null);
             meshData.Primitives.Add(primitive);
@@ -185,37 +185,11 @@ namespace aogltf
             int meshIndex = sceneData.Meshes.Count;
             sceneData.Meshes.Add(meshData);
 
-            var (translation, rotation, scale) = DecomposeMatrix(chunk.Transform);
-
-            var node = new NodeData
+            return new NodeData
             {
                 Name = $"TerrainChunk_{chunkIndex}",
-                MeshIndex = meshIndex,
-                Translation = translation,
-                Rotation = rotation,
-                Scale = scale
+                MeshIndex = meshIndex
             };
-
-            return node;
-        }
-
-        private (System.Numerics.Vector3?, System.Numerics.Quaternion?, System.Numerics.Vector3?) DecomposeMatrix(AODB.Common.Structs.Matrix matrix)
-        {
-            // Fix coordinate system
-            var mat = new System.Numerics.Matrix4x4(
-                -matrix.values[0, 0], matrix.values[1, 0], -matrix.values[2, 0], matrix.values[3, 0],
-                -matrix.values[0, 1], matrix.values[1, 1], -matrix.values[2, 1], matrix.values[3, 1],
-                -matrix.values[0, 2], matrix.values[1, 2], -matrix.values[2, 2], matrix.values[3, 2],
-                -matrix.values[0, 3], matrix.values[1, 3], -matrix.values[2, 3], matrix.values[3, 3]
-            );
-
-            System.Numerics.Matrix4x4.Decompose(mat, out var scale, out var rotation, out var translation);
-
-            return (
-                translation != System.Numerics.Vector3.Zero ? translation : null,
-                rotation != System.Numerics.Quaternion.Identity ? rotation : null,
-                scale != System.Numerics.Vector3.One ? scale : null
-            );
         }
     }
 }

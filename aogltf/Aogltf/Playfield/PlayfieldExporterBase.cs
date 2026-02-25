@@ -1,19 +1,22 @@
 ﻿using AODB;
+using aogltf;
 using gltf;
 
 public abstract class PlayfieldExporterBase<TData>
 {
     protected RdbController _rdbController;
     protected int PlayfieldId;
+    protected ExportMirror ExportTransforms;
 
     protected PlayfieldExporterBase(RdbController rdbController)
     {
         _rdbController = rdbController;
     }
 
-    public bool Export(int playfieldId, string outputFolder, FileFormat fileFormat)
+    public bool Export(int playfieldId, string outputFolder, FileFormat fileFormat, ExportMirror transforms = ExportMirror.NoMirror)
     {
         PlayfieldId = playfieldId;
+        ExportTransforms = transforms;
         var data = ParseData();
 
         return fileFormat switch

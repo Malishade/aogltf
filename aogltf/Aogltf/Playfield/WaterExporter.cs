@@ -27,6 +27,8 @@ namespace aogltf
                 var sceneBuilder = new WaterSceneBuilder();
                 SceneData sceneData = sceneBuilder.BuildWaterScene(waterData);
 
+                SceneTransformHelper.Apply(sceneData, ExportTransforms);
+
                 Gltf gltf = AOGltfBuilder.Create(sceneData, out byte[] bufferData);
 
                 GltfFileWriter.WriteToFile(Path.Combine(outputFolder, $"Playfield_Water_{PlayfieldId}.glb"), gltf, bufferData);
@@ -49,6 +51,8 @@ namespace aogltf
 
                 var sceneBuilder = new WaterSceneBuilder();
                 SceneData sceneData = sceneBuilder.BuildWaterScene(waterData);
+
+                SceneTransformHelper.Apply(sceneData, ExportTransforms);
 
                 Gltf gltf = AOGltfBuilder.Create(sceneData, out byte[] bufferData);
                 gltf.Buffers[0].Uri = $"{objectName}.bin";
@@ -93,17 +97,10 @@ namespace aogltf
         private NodeData CreateWaterNode(PfWaterMeshData water, int waterIndex, SceneData sceneData)
         {
             var meshData = new MeshData();
-            var verts = water.Vertices.Select(v => new Vector3(v.X, v.Y, -v.Z)).ToArray();
+            var verts = water.Vertices.Select(v => new Vector3(v.X, v.Y, v.Z)).ToArray();
             var normals = Array.Empty<Vector3>();
             var uvs = Array.Empty<Vector2>();
-
-            var indices = new ushort[water.Triangles.Length];
-            for (int i = 0; i < water.Triangles.Length; i += 3)
-            {
-                indices[i] = (ushort)water.Triangles[i];
-                indices[i + 1] = (ushort)water.Triangles[i + 2];
-                indices[i + 2] = (ushort)water.Triangles[i + 1];
-            }
+            var indices = water.Triangles.Select(t => (ushort)t).ToArray();
 
             var primitive = new PrimitiveData(verts, normals, uvs, indices, null);
             meshData.Primitives.Add(primitive);

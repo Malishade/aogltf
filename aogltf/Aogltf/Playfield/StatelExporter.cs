@@ -1,10 +1,5 @@
 ﻿using AODB;
-using AODB.Common.DbClasses;
-using AODB.Common.RDBObjects;
-using AODB.Common.Structs;
 using gltf;
-using System.Numerics;
-using System.Security.AccessControl;
 using Quaternion = System.Numerics.Quaternion;
 using Vector2 = System.Numerics.Vector2;
 using Vector3 = System.Numerics.Vector3;
@@ -13,7 +8,6 @@ namespace aogltf
 {
     public class StatelExporter : PlayfieldExporterBase<List<PfStatelData>>
     {
-
         public StatelExporter(RdbController rdbController) : base(rdbController)
         {
         }
@@ -68,6 +62,8 @@ namespace aogltf
                 var sceneBuilder = new StatelSceneBuilder();
                 SceneData sceneData = sceneBuilder.BuildStatelScene(statelData);
 
+                SceneTransformHelper.Apply(sceneData, ExportTransforms);
+
                 var materialBuilder = new StatelMaterialBuilder(_rdbController, outputFolder, true);
                 materialBuilder.BuildMaterialsFromStatelData(statelData);
 
@@ -99,6 +95,8 @@ namespace aogltf
 
                 var sceneBuilder = new StatelSceneBuilder();
                 SceneData sceneData = sceneBuilder.BuildStatelScene(pfStatelData);
+
+                SceneTransformHelper.Apply(sceneData, ExportTransforms);
 
                 var materialBuilder = new StatelMaterialBuilder(_rdbController, outputFolder, false);
                 materialBuilder.BuildMaterialsFromStatelData(pfStatelData);
@@ -154,27 +152,24 @@ namespace aogltf
 
             var statelNode = new NodeData { Name = pfStatel.Name };
 
-            // Apply statel transforms
             ApplyStatelTransform(statelNode, pfStatel);
 
-            // Process each submesh from the PfStatelData
             foreach (var pfMesh in pfStatel.Meshes)
             {
                 int? meshIndex = CreateMeshFromPfMeshData(pfMesh, sceneData);
                 if (meshIndex.HasValue)
                 {
-                    // Create a child node for each submesh to handle BasePosition and BaseRotation
                     var submeshNode = new NodeData
                     {
                         Name = pfMesh.Name,
                         MeshIndex = meshIndex.Value,
-                        Translation = new Vector3(-pfMesh.BasePosition.X, pfMesh.BasePosition.Y, pfMesh.BasePosition.Z),
+                        Translation = new Vector3(pfMesh.BasePosition.X, pfMesh.BasePosition.Y, pfMesh.BasePosition.Z),
                         Rotation = new Quaternion(
-                             -pfMesh.BaseRotation.X,
-                             pfMesh.BaseRotation.Y,
-                             pfMesh.BaseRotation.Z,
-                             -pfMesh.BaseRotation.W
-                         )
+                            pfMesh.BaseRotation.X,
+                            pfMesh.BaseRotation.Y,
+                            pfMesh.BaseRotation.Z,
+                            pfMesh.BaseRotation.W
+                        )
                     };
 
                     int submeshNodeIndex = sceneData.Nodes.Count;
@@ -193,47 +188,23 @@ namespace aogltf
 
             var meshData = new MeshData();
 
-            // Negate X for coordinate system conversion
-            var verts = pfMesh.Vertices.Select(v => new Vector3(-v.X, v.Y, v.Z)).ToArray();
+            var verts = pfMesh.Vertices.Select(v => new Vector3(v.X, v.Y, v.Z)).ToArray();
 
             var normals = Array.Empty<Vector3>();
-
             if (pfMesh.Normals != null && pfMesh.Normals.Count > 0)
-            {
-                // Negate X for normals too
-                normals = pfMesh.Normals.Select(n => new Vector3(-n.X, n.Y, n.Z)).ToArray();
-            }
-            var uvs = Array.Empty<Vector2>();
+                normals = pfMesh.Normals.Select(n => new Vector3(n.X, n.Y, n.Z)).ToArray();
 
+            var uvs = Array.Empty<Vector2>();
             if (pfMesh.UV != null && pfMesh.UV.Count > 0)
-            {
-                uvs = pfMesh.UV.Select(uv => new Vector2(uv.X, -uv.Y)).ToArray();
-            }
+                uvs = pfMesh.UV.Select(uv => new Vector2(uv.X, uv.Y)).ToArray();
 
             var indices = Array.Empty<ushort>();
-
             if (pfMesh.Triangles != null && pfMesh.Triangles.Count > 0)
-            {
-                // Reverse triangle winding order when flipping X axis
-                var triangles = pfMesh.Triangles.ToArray();
-                indices = new ushort[triangles.Length];
-                for (int i = 0; i < triangles.Length; i += 3)
-                {
-                    indices[i] = checked((ushort)triangles[i]);
-                    indices[i + 1] = checked((ushort)triangles[i + 2]); // Swap
-                    indices[i + 2] = checked((ushort)triangles[i + 1]); // to reverse winding
-                }
-            }
+                indices = pfMesh.Triangles.Select(t => checked((ushort)t)).ToArray();
 
-            var matIndex = 0;
-
-            if (pfMesh.Material != null)
-            {
-                matIndex = pfMesh.Material.TextureId;
-            }
+            var matIndex = pfMesh.Material?.TextureId ?? 0;
 
             var primitive = new PrimitiveData(verts, normals, uvs, indices, matIndex);
-
             meshData.Primitives.Add(primitive);
 
             int meshIndex = sceneData.Meshes.Count;
@@ -243,20 +214,17 @@ namespace aogltf
 
         private void ApplyStatelTransform(NodeData node, PfStatelData pfStatel)
         {
-            // Position - negate X
-            var position = new Vector3(-pfStatel.Position.X, pfStatel.Position.Y, pfStatel.Position.Z);
+            var position = new Vector3(pfStatel.Position.X, pfStatel.Position.Y, pfStatel.Position.Z);
 
-            // Rotation (quaternion) - negate X and W for coordinate system conversion
             var rotation = new Quaternion(
-                -pfStatel.Rotation.X,
+                pfStatel.Rotation.X,
                 pfStatel.Rotation.Y,
                 pfStatel.Rotation.Z,
-                -pfStatel.Rotation.W
+                pfStatel.Rotation.W
             );
 
-            // Scale
             Vector3 scale;
-            if ((pfStatel.Flag & 1) > 0) // sheared flag
+            if ((pfStatel.Flag & 1) > 0)
             {
                 position.Y += pfStatel.ShearFactor * 4;
                 scale = new Vector3(pfStatel.Scale.X, 1f, 1f);
@@ -290,9 +258,7 @@ namespace aogltf
                 foreach (var pfMesh in pfStatel.Meshes)
                 {
                     if (pfMesh.Material != null && !_textureToMaterialMap.ContainsKey(pfMesh.Material.TextureId))
-                    {
                         BuildMaterialFromPfMaterial(pfMesh.Material);
-                    }
                 }
             }
         }
@@ -305,9 +271,7 @@ namespace aogltf
             var gltfMaterial = CreateBasicMaterial(pfMaterial.TextureName);
 
             if (pfMaterial.TextureId > 0)
-            {
                 SetBaseColorTexture(gltfMaterial, pfMaterial.TextureId);
-            }
 
             int matIdx = AddMaterialToList(gltfMaterial);
             _textureToMaterialMap[pfMaterial.TextureId] = matIdx;
